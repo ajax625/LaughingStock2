@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+/.pnpm
+/.yarn
+
+# Next.js Build Output
+/.next/
+/out/
+/build/
+
+# Local Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database Files
+/prisma/*.db
+/prisma/*.db-journal
+
+# Logs & Operating System Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

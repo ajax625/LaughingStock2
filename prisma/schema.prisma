@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String     @id @default(cuid())
+  name       String?
+  email      String     @unique
+  password   String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  portfolio  Portfolio?
+  strategies Strategy[]
+}
+
+model Portfolio {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cash      Float      @default(100000.0)
+  positions Position[]
+  trades    Trade[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Position {
+  id          String    @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  symbol      String
+  quantity    Int
+  avgCost     Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([portfolioId, symbol])
+}
+
+model Trade {
+  id          String    @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  symbol      String
+  type        String
+  quantity    Int
+  price       Float
+  total       Float
+  createdAt   DateTime  @default(now())
+}
+
+model Strategy {
+  id               String   @id @default(cuid())
+  symbol           String
+  name             String
+  description      String?
+  creatorId        String
+  creator          User     @relation(fields: [creatorId], references: [id])
+  moveThresholdPct Float
+  lookaheadDays    Int
+  lookbackBars     Int
+  topIndicators    String
+  jevPrompt        String
+  actionScores     String
+  winRate          Float
+  avgReturn        Float
+  isPublic         Boolean  @default(true)
+  signals          Signal[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Signal {
+  id           String   @id @default(cuid())
+  strategyId   String
+  strategy     Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  symbol       String
+  action       String
+  confidence   Float
+  triggerPrice Float
+  rationale    String
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+}
+
+model MarketCandle {
+  id        String   @id @default(cuid())
+  symbol    String
+  interval  String   @default("1d")
+  timestamp DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    BigInt
+  createdAt DateTime @default(now())
+
+  @@unique([symbol, interval, timestamp])
+  @@index([symbol, timestamp])
+}

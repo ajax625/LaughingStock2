@@ -1,0 +1,921 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import StockChart from '@/components/StockChart';
+import {
+  TrendingUp,
+  Briefcase,
+  Search,
+  FlaskConical,
+  Radio,
+  Plus,
+  Minus,
+  Sparkles,
+  ArrowUpRight,
+  UserCheck,
+  Sliders,
+  Award,
+} from 'lucide-react';
+
+export default function Home() {
+  const { data: session } = useSession();
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'portfolio' | 'research' | 'miner' | 'signals'>('dashboard');
+
+  // Portfolio State
+  const [portfolio, setPortfolio] = useState<any>(null);
+  const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [tradeSymbol, setTradeSymbol] = useState('NVDA');
+  const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
+  const [tradeQty, setTradeQty] = useState(10);
+
+  // Research Ticker State & Conviction Parameters (x, y, z, V_min, M)
+  const [researchSymbol, setResearchSymbol] = useState('INTC');
+  const [paramX, setParamX] = useState(20);
+  const [paramVmin, setParamVmin] = useState(1.3);
+  const [paramY, setParamY] = useState(1);
+  const [paramM, setParamM] = useState(3.5);
+  const [paramZ, setParamZ] = useState(20);
+  const [researchData, setResearchData] = useState<any>(null);
+
+  // Pattern Miner State
+  const [minerSymbol, setMinerSymbol] = useState('NVDA');
+  const [minerPct, setMinerPct] = useState(5.0);
+  const [minerDays, setMinerDays] = useState(3);
+  const [minerBars, setMinerBars] = useState(10);
+  const [minerResult, setMinerResult] = useState<any>(null);
+
+  // App Universe Strategies State
+  const [strategies, setStrategies] = useState<any[]>([]);
+
+  const fetchPortfolio = async () => {
+    try {
+      const res = await fetch('/api/portfolio');
+      if (res.ok) {
+        const data = await res.json();
+        setPortfolio(data.portfolio);
+      }
+    } catch (err) {
+      console.error('Failed to load portfolio:', err);
+    }
+  };
+
+  const fetchResearch = useCallback(async (symbol = researchSymbol) => {
+    try {
+      const queryParams = new URLSearchParams({
+        x: paramX.toString(),
+        V_min: paramVmin.toString(),
+        y: paramY.toString(),
+        M: paramM.toString(),
+        z: paramZ.toString(),
+      });
+      const res = await fetch(`/api/research/${symbol}?${queryParams}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResearchData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load research data:', err);
+    }
+  }, [researchSymbol, paramX, paramVmin, paramY, paramM, paramZ]);
+
+  // Real-time Auto Refresh when ANY parameter or symbol changes!
+  useEffect(() => {
+    fetchPortfolio();
+    fetchStrategies();
+    runMiner('NVDA');
+  }, []);
+
+  useEffect(() => {
+    fetchResearch(researchSymbol);
+  }, [fetchResearch, researchSymbol]);
+
+  const fetchStrategies = async () => {
+    try {
+      const res = await fetch('/api/strategies');
+      if (res.ok) {
+        const data = await res.json();
+        setStrategies(data.strategies || []);
+      }
+    } catch (err) {
+      console.error('Failed to load strategies:', err);
+    }
+  };
+
+  const runMiner = async (sym = minerSymbol) => {
+    try {
+      const res = await fetch('/api/miner/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: sym,
+          moveThresholdPct: minerPct,
+          lookaheadDays: minerDays,
+          lookbackBars: minerBars,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMinerResult(data);
+      }
+    } catch (err) {
+      console.error('Failed to run miner:', err);
+    }
+  };
+
+  const handleExecuteTrade = async () => {
+    try {
+      const res = await fetch('/api/portfolio/trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: tradeSymbol,
+          type: tradeType,
+          quantity: tradeQty,
+        }),
+      });
+      if (res.ok) {
+        alert(`${tradeType} order executed for ${tradeQty} shares of ${tradeSymbol}!`);
+        setTradeModalOpen(false);
+        fetchPortfolio();
+      }
+    } catch (err) {
+      alert('Trade order failed.');
+    }
+  };
+
+  const saveStrategy = async () => {
+    if (!minerResult) return;
+    try {
+      const res = await fetch('/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: minerResult.miningResult.symbol,
+          name: `${minerResult.miningResult.symbol} Typeface.ai JEV Strategy`,
+          description: `Auto-mined strategy for ${minerResult.miningResult.symbol}`,
+          moveThresholdPct: minerResult.miningResult.moveThresholdPct,
+          lookaheadDays: minerResult.miningResult.lookaheadDays,
+          lookbackBars: minerResult.miningResult.lookbackBars,
+          topIndicators: minerResult.miningResult.topIndicators,
+          jevPrompt: minerResult.miningResult.jevPrompt,
+          actionScores: minerResult.jevEvaluation.probabilities,
+          winRate: minerResult.miningResult.winRate,
+          avgReturn: minerResult.miningResult.avgReturn,
+        }),
+      });
+      if (res.ok) {
+        alert('Strategy published to App Universe!');
+        fetchStrategies();
+        setActiveTab('signals');
+      }
+    } catch (err) {
+      alert('Failed to save strategy.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header / Navbar */}
+      <header className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 text-white p-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md">
+            <TrendingUp className="w-6 h-6" />
+            <span className="text-xl tracking-tight">LaughingStock</span>
+          </div>
+          <div>
+            <h1 className="text-sm font-semibold text-foreground">Market Intelligence & Strategy Engine</h1>
+            <p className="text-xs text-muted">Typeface.ai JEV Signal Engine • Multi-User Trading Portal</p>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <nav className="flex overflow-x-auto w-full md:w-auto border-b md:border-b-0 border-border gap-1 text-sm font-medium">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'dashboard' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" /> Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('portfolio')}
+            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'portfolio' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" /> Portfolio
+          </button>
+          <button
+            onClick={() => setActiveTab('research')}
+            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'research' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            <Search className="w-4 h-4" /> 🔬 Conviction Detector
+          </button>
+          <button
+            onClick={() => setActiveTab('miner')}
+            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'miner' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            <FlaskConical className="w-4 h-4" /> 🧠 Phase 2: Analysis
+          </button>
+          <button
+            onClick={() => setActiveTab('signals')}
+            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
+              activeTab === 'signals' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            <Radio className="w-4 h-4" /> 📡 Phase 3: Monitoring
+          </button>
+        </nav>
+
+        {/* Cash & User Info */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border">
+          <div className="text-right">
+            <div className="text-xs text-muted">Available Cash</div>
+            <div className="text-sm font-bold text-emerald-500">
+              ${portfolio ? portfolio.cash.toLocaleString() : '100,000.00'}
+            </div>
+          </div>
+          {session ? (
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500/20"
+            >
+              <UserCheck className="w-3.5 h-3.5" /> {session.user?.name || 'User'}
+            </button>
+          ) : (
+            <button
+              onClick={() => signIn()}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* VIEW 1: DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <section className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+              <div className="text-xs text-muted font-medium">Portfolio Net Worth</div>
+              <div className="text-2xl font-extrabold mt-1 text-foreground">
+                ${portfolio ? portfolio.netWorth.toLocaleString() : '148,920.50'}
+              </div>
+              <div className="text-xs text-emerald-500 font-semibold mt-1 flex items-center gap-1">
+                <ArrowUpRight className="w-3.5 h-3.5" /> +$3,420.00 (+2.35%) <span className="text-muted font-normal">Today</span>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+              <div className="text-xs text-muted font-medium">Total Unrealized P&L</div>
+              <div className="text-2xl font-extrabold mt-1 text-emerald-500">
+                +${portfolio ? portfolio.totalUnrealizedPL.toLocaleString() : '24,180.00'}
+              </div>
+              <div className="text-xs text-emerald-500 font-semibold mt-1">+19.38% Return</div>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+              <div className="text-xs text-muted font-medium">Typeface.ai JEV Signals</div>
+              <div className="text-2xl font-extrabold mt-1 text-blue-500">7 Active</div>
+              <div className="text-xs text-muted mt-1">4 High Probability (&gt;75%)</div>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+              <div className="text-xs text-muted font-medium">Mined Ticker Strategies</div>
+              <div className="text-2xl font-extrabold mt-1 text-purple-500">{strategies.length} Shared</div>
+              <div className="text-xs text-muted mt-1">App Universe Shared</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="font-bold text-lg text-foreground">Current Holdings Performance</h2>
+                <button onClick={() => setActiveTab('portfolio')} className="text-xs text-blue-500 hover:underline font-medium">
+                  Manage Portfolio →
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted border-b border-border uppercase">
+                    <tr>
+                      <th className="pb-3 font-semibold">Symbol</th>
+                      <th className="pb-3 font-semibold">Shares</th>
+                      <th className="pb-3 font-semibold">Avg Cost</th>
+                      <th className="pb-3 font-semibold">Market Price</th>
+                      <th className="pb-3 font-semibold">Total Value</th>
+                      <th className="pb-3 font-semibold">Unrealized P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border font-medium">
+                    {portfolio && portfolio.positions ? (
+                      portfolio.positions.map((pos: any) => (
+                        <tr key={pos.symbol}>
+                          <td className="py-3 font-bold text-blue-500">{pos.symbol}</td>
+                          <td>{pos.quantity}</td>
+                          <td>${pos.avgCost.toFixed(2)}</td>
+                          <td>${pos.currentPrice?.toFixed(2) || '128.50'}</td>
+                          <td>${pos.marketValue?.toLocaleString() || (pos.quantity * pos.avgCost).toLocaleString()}</td>
+                          <td className={pos.unrealizedPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
+                            {pos.unrealizedPL >= 0 ? '+' : ''}${pos.unrealizedPL?.toFixed(2) || '0.00'} ({pos.unrealizedPLPct}%)
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-4 text-center text-muted">Loading holdings...</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Live Signals Sidebar */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b border-border pb-3">
+                <h2 className="font-bold text-lg text-foreground flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Typeface.ai JEV Signals
+                </h2>
+                <button onClick={() => setActiveTab('signals')} className="text-xs text-blue-500 hover:underline">View All</button>
+              </div>
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-emerald-400">NVDA • BUY Signal</span>
+                    <span className="text-xs bg-emerald-500 text-white font-bold px-2 py-0.5 rounded">JEV: 84% Prob</span>
+                  </div>
+                  <p className="text-xs text-muted">RSI oversold rebound + 20-EMA Golden Cross detected on 3-day pre-move window.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-rose-400">AMD • SHORT Signal</span>
+                    <span className="text-xs bg-rose-500 text-white font-bold px-2 py-0.5 rounded">JEV: 76% Prob</span>
+                  </div>
+                  <p className="text-xs text-muted">Bollinger Upper Band rejection with heavy volume spike pre-drop pattern.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* VIEW 2: PORTFOLIO MANAGEMENT */}
+      {activeTab === 'portfolio' && (
+        <section className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card border border-border rounded-xl p-5 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold">Your Single Portfolio</h2>
+              <p className="text-xs text-muted">Manage trades, cash balances, and monitor execution metrics in real-time.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setTradeType('BUY'); setTradeModalOpen(true); }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Buy Stock
+              </button>
+              <button
+                onClick={() => { setTradeType('SELL'); setTradeModalOpen(true); }}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm"
+              >
+                <Minus className="w-4 h-4" /> Sell Stock
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="font-bold text-md border-b border-border pb-3">Open Positions & P&L Analysis</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted border-b border-border uppercase">
+                    <tr>
+                      <th className="pb-3">Symbol</th>
+                      <th className="pb-3">Shares</th>
+                      <th className="pb-3">Avg Cost</th>
+                      <th className="pb-3">Current Price</th>
+                      <th className="pb-3">Market Value</th>
+                      <th className="pb-3">Total P&L</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {portfolio && portfolio.positions && portfolio.positions.map((pos: any) => (
+                      <tr key={pos.symbol}>
+                        <td className="py-3 font-bold">{pos.symbol}</td>
+                        <td>{pos.quantity}</td>
+                        <td>${pos.avgCost.toFixed(2)}</td>
+                        <td>${pos.currentPrice?.toFixed(2) || '128.50'}</td>
+                        <td>${pos.marketValue?.toLocaleString() || (pos.quantity * pos.avgCost).toLocaleString()}</td>
+                        <td className={pos.unrealizedPL >= 0 ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                          {pos.unrealizedPL >= 0 ? '+' : ''}${pos.unrealizedPL?.toFixed(2)}
+                        </td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => { setTradeSymbol(pos.symbol); setTradeType('SELL'); setTradeModalOpen(true); }}
+                            className="text-xs bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-2.5 py-1 rounded border border-rose-500/30"
+                          >
+                            Sell
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="font-bold text-md border-b border-border pb-3">Recent Transactions</h3>
+              <div className="space-y-3 text-xs">
+                {portfolio && portfolio.trades && portfolio.trades.length > 0 ? (
+                  portfolio.trades.map((t: any) => (
+                    <div key={t.id} className="flex justify-between items-center p-2.5 rounded bg-background border border-border">
+                      <div>
+                        <span className={`font-bold ${t.type === 'BUY' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {t.type} {t.symbol}
+                        </span> • {t.quantity} shares @ ${t.price.toFixed(2)}
+                        <div className="text-[10px] text-muted">{new Date(t.createdAt).toLocaleString()}</div>
+                      </div>
+                      <div className="font-semibold text-right">${t.total.toLocaleString()}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-muted text-center py-4">No recent trade activity</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* VIEW 3: POST-OPEN CONVICTION DAY DETECTOR STUDIO */}
+      {activeTab === 'research' && (
+        <section className="space-y-6">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-4">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Sliders className="w-6 h-6 text-amber-400" /> Post-Open Conviction Day Detector Studio
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Adjust parameters in real-time to recalculate VolumeMA(x), RVOL, MedianPriceMA(y), Range%, & GapMA(z) across 365 daily bars.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <input
+                  type="text"
+                  value={researchSymbol}
+                  onChange={(e) => setResearchSymbol(e.target.value.toUpperCase())}
+                  className="bg-background border border-border rounded-lg px-4 py-2 font-bold uppercase text-lg text-foreground w-32 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  onClick={() => fetchResearch(researchSymbol)}
+                  className="bg-amber-600 text-black font-bold text-sm px-4 py-2 rounded-lg hover:bg-amber-500 flex items-center gap-1.5 shadow"
+                >
+                  <Sparkles className="w-4 h-4" /> Refresh Ticker
+                </button>
+              </div>
+            </div>
+
+            {/* Configurable Parameter Control Panel (x, y, z, V_min, M) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-1">
+              <div className="bg-background p-3 rounded-lg border border-border">
+                <label className="text-xs text-amber-400 font-bold block mb-1">Volume MA Window (x)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={paramX}
+                    onChange={(e) => setParamX(Number(e.target.value))}
+                    min="5"
+                    max="50"
+                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-amber-400"
+                  />
+                  <span className="text-xs text-muted">bars</span>
+                </div>
+              </div>
+
+              <div className="bg-background p-3 rounded-lg border border-border">
+                <label className="text-xs text-amber-400 font-bold block mb-1">RVOL Threshold (V_min)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={paramVmin}
+                    onChange={(e) => setParamVmin(Number(e.target.value))}
+                    step="0.1"
+                    min="1.0"
+                    max="3.0"
+                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-amber-400"
+                  />
+                  <span className="text-xs text-muted">mult</span>
+                </div>
+              </div>
+
+              <div className="bg-background p-3 rounded-lg border border-border">
+                <label className="text-xs text-cyan-400 font-bold block mb-1">Median Price MA (y)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={paramY}
+                    onChange={(e) => setParamY(Number(e.target.value))}
+                    min="1"
+                    max="20"
+                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-cyan-400"
+                  />
+                  <span className="text-xs text-muted">bars</span>
+                </div>
+              </div>
+
+              <div className="bg-background p-3 rounded-lg border border-border">
+                <label className="text-xs text-purple-400 font-bold block mb-1">Min Range % (M)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={paramM}
+                    onChange={(e) => setParamM(Number(e.target.value))}
+                    step="0.5"
+                    min="1.0"
+                    max="10.0"
+                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-purple-400"
+                  />
+                  <span className="text-xs text-muted">%</span>
+                </div>
+              </div>
+
+              <div className="bg-background p-3 rounded-lg border border-border">
+                <label className="text-xs text-muted font-bold block mb-1">Gap MA Window (z)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={paramZ}
+                    onChange={(e) => setParamZ(Number(e.target.value))}
+                    min="5"
+                    max="50"
+                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-foreground"
+                  />
+                  <span className="text-xs text-muted">bars</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Chart with Conviction Visual Markers & Line Graphs */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-3 text-xs font-semibold">
+                <span className="px-3 py-1 bg-amber-500 text-black font-bold rounded flex items-center gap-1">
+                  <Award className="w-3.5 h-3.5" /> Conviction Days Flagged: {researchData?.convictionCount || 0}
+                </span>
+                <span className="px-3 py-1 bg-background border border-border rounded text-muted">
+                  365 Daily Candles Harvested
+                </span>
+              </div>
+              <div className="text-xs text-muted">
+                Rules: RVOL &gt; {paramVmin}x • Range Straddle (Median y={paramY}) • Range% &gt; {paramM}%
+              </div>
+            </div>
+
+            <StockChart candles={researchData?.candles || []} />
+          </div>
+
+          {/* Flagged Conviction Candidates Table */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-bold text-md text-foreground flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" /> Flagged Conviction Candidate Sessions ({researchData?.convictionCount || 0})
+              </h3>
+              <span className="text-xs text-muted">Queued for Phase 2 Precursor Fingerprint Research</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-muted border-b border-border uppercase">
+                  <tr>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Open</th>
+                    <th className="pb-3">High / Low Range</th>
+                    <th className="pb-3">Close</th>
+                    <th className="pb-3">RVOL (x={paramX})</th>
+                    <th className="pb-3">Median (y={paramY})</th>
+                    <th className="pb-3">Range %</th>
+                    <th className="pb-3">Direction</th>
+                    <th className="pb-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border font-medium">
+                  {researchData && researchData.candidates && researchData.candidates.length > 0 ? (
+                    researchData.candidates.map((cand: any) => (
+                      <tr key={cand.date} className="hover:bg-background/50 transition">
+                        <td className="py-3 font-bold text-amber-400">{cand.date}</td>
+                        <td>${cand.open.toFixed(2)}</td>
+                        <td className="text-xs text-muted">${cand.high.toFixed(2)} – ${cand.low.toFixed(2)}</td>
+                        <td className="font-bold">${cand.close.toFixed(2)}</td>
+                        <td>
+                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold text-xs">
+                            {cand.rvol}x
+                          </span>
+                        </td>
+                        <td className="text-xs">${cand.medianPriceMA.toFixed(2)}</td>
+                        <td className="text-purple-400 font-bold">{cand.rangePct}%</td>
+                        <td>
+                          <span className={`text-xs px-2 py-0.5 rounded font-bold ${cand.direction === 'BULLISH' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}`}>
+                            {cand.direction}
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => {
+                              setMinerSymbol(researchSymbol);
+                              setActiveTab('miner');
+                              runMiner(researchSymbol);
+                            }}
+                            className="text-xs bg-purple-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-purple-700 shadow"
+                          >
+                            Mine Fingerprint →
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-muted italic">
+                        No conviction sessions found matching current parameters (RVOL &gt; {paramVmin}x, Range% &gt; {paramM}%). Try lowering thresholds.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* VIEW 4: PHASE 2 ANALYSIS */}
+      {activeTab === 'miner' && (
+        <section className="space-y-6">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <FlaskConical className="w-6 h-6 text-purple-400" /> Phase 2: Analysis & Strategy Formalization
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Analyzes pre-move technical fingerprints, constructs JEV prompts, and outputs Typeface.ai JEV action scores.
+                </p>
+              </div>
+              <span className="text-xs font-mono bg-purple-500/20 text-purple-400 border border-purple-500/40 px-3 py-1 rounded-full">
+                Typeface.ai JEV Engine
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Target Symbol</label>
+                <input
+                  type="text"
+                  value={minerSymbol}
+                  onChange={(e) => setMinerSymbol(e.target.value.toUpperCase())}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-bold uppercase text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Move Threshold (%)</label>
+                <input
+                  type="number"
+                  value={minerPct}
+                  onChange={(e) => setMinerPct(Number(e.target.value))}
+                  step="0.5"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Lookahead (Days)</label>
+                <input
+                  type="number"
+                  value={minerDays}
+                  onChange={(e) => setMinerDays(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Pre-Move Window (Bars)</label>
+                <input
+                  type="number"
+                  value={minerBars}
+                  onChange={(e) => setMinerBars(Number(e.target.value))}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => runMiner()}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm py-2 rounded-lg shadow-md transition flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className="w-4 h-4" /> Run Analysis
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {minerResult && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
+                  <span>📝 Typeface.ai JEV Model Prompt</span>
+                  <span className="text-xs text-emerald-500 font-normal">Auto-Generated</span>
+                </h3>
+                <textarea
+                  readOnly
+                  value={minerResult.miningResult.jevPrompt}
+                  className="w-full h-64 bg-[#0d1117] text-emerald-400 font-mono text-xs p-3 rounded-lg border border-border focus:outline-none leading-relaxed"
+                />
+                <button
+                  onClick={saveStrategy}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-2 rounded-lg shadow transition"
+                >
+                  💾 Adopt Strategy into App Universe
+                </button>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
+                  <span>🧠 Typeface.ai JEV Deterministic Action Scores</span>
+                  <span className="text-xs text-purple-400 font-semibold bg-purple-500/20 px-2 py-0.5 rounded">Evaluated</span>
+                </h3>
+
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-emerald-400">BUY (Long Entry)</span>
+                      <span className="text-emerald-400">{minerResult.jevEvaluation.probabilities.BUY}%</span>
+                    </div>
+                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.BUY}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-blue-400">HOLD (Maintain Position)</span>
+                      <span className="text-blue-400">{minerResult.jevEvaluation.probabilities.HOLD}%</span>
+                    </div>
+                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                      <div className="bg-blue-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.HOLD}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-rose-400">SELL (Exit Position)</span>
+                      <span className="text-rose-400">{minerResult.jevEvaluation.probabilities.SELL}%</span>
+                    </div>
+                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                      <div className="bg-rose-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.SELL}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-amber-400">SHORT (Short Entry)</span>
+                      <span className="text-amber-400">{minerResult.jevEvaluation.probabilities.SHORT}%</span>
+                    </div>
+                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                      <div className="bg-amber-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.SHORT}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-gray-400">NONE (Do Not Make Any Move)</span>
+                      <span className="text-gray-400">{minerResult.jevEvaluation.probabilities.NONE}%</span>
+                    </div>
+                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                      <div className="bg-gray-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.NONE}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-background rounded-lg border border-border text-xs space-y-1">
+                  <div className="font-bold text-foreground">Typeface.ai JEV Rationale:</div>
+                  <p className="text-muted">{minerResult.jevEvaluation.rationale}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* VIEW 5: PHASE 3 MONITORING */}
+      {activeTab === 'signals' && (
+        <section className="space-y-6">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-bold">Phase 3: Live Market Monitoring & Typeface.ai JEV Signals</h2>
+              <p className="text-xs text-muted">Active strategies applied to live market data predicting directional moves.</p>
+            </div>
+            <div className="text-xs bg-blue-500/10 border border-blue-500/30 text-blue-400 px-3 py-1.5 rounded-lg font-semibold">
+              🌐 {strategies.length} Shared Strategies Active
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <h3 className="font-bold text-md border-b border-border pb-3">Community Strategy Repository</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-muted border-b border-border uppercase">
+                  <tr>
+                    <th className="pb-3">Ticker</th>
+                    <th className="pb-3">Strategy Name</th>
+                    <th className="pb-3">Created By</th>
+                    <th className="pb-3">Pre-Move Config</th>
+                    <th className="pb-3">Win Rate</th>
+                    <th className="pb-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {strategies.map((strat) => (
+                    <tr key={strat.id}>
+                      <td className="py-3 font-bold text-blue-500">{strat.symbol}</td>
+                      <td className="font-semibold">{strat.name}</td>
+                      <td>{strat.creator?.name || '@trader'}</td>
+                      <td>+{strat.moveThresholdPct}% move / {strat.lookbackBars}-bar window</td>
+                      <td className="text-emerald-500 font-bold">{strat.winRate}%</td>
+                      <td className="text-right">
+                        <button
+                          onClick={() => {
+                            setMinerSymbol(strat.symbol);
+                            setActiveTab('miner');
+                            runMiner(strat.symbol);
+                          }}
+                          className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-blue-700"
+                        >
+                          Inspect & Run Analysis
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Trade Execution Modal */}
+      {tradeModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-bold text-lg text-foreground">Execute Trade Order</h3>
+              <button onClick={() => setTradeModalOpen(false)} className="text-muted hover:text-foreground font-bold">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Symbol</label>
+                <input
+                  type="text"
+                  value={tradeSymbol}
+                  onChange={(e) => setTradeSymbol(e.target.value.toUpperCase())}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-bold uppercase text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Action</label>
+                <select
+                  value={tradeType}
+                  onChange={(e) => setTradeType(e.target.value as any)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
+                >
+                  <option value="BUY">BUY Shares</option>
+                  <option value="SELL">SELL Shares</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted font-semibold block mb-1">Quantity (Shares)</label>
+                <input
+                  type="number"
+                  value={tradeQty}
+                  onChange={(e) => setTradeQty(Number(e.target.value))}
+                  min="1"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
+                />
+              </div>
+            </div>
+            <div className="pt-2 flex justify-end gap-3 border-t border-border">
+              <button onClick={() => setTradeModalOpen(false)} className="px-4 py-2 rounded-lg border border-border text-sm font-semibold text-muted">
+                Cancel
+              </button>
+              <button onClick={handleExecuteTrade} className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow">
+                Confirm Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
