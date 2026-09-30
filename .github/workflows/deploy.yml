@@ -32,7 +32,7 @@ jobs:
             --exclude='.env.*' \
             --exclude='.git' \
             --exclude='.DS_Store' \
-            . ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}:~/laughingstock/
+            . ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}:~/laughingstock2/
 
       - name: Write Production Environment Variables
         env:
@@ -42,14 +42,14 @@ jobs:
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
             JEV_API_ENDPOINT=${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
         run: |
-          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "mkdir -p ~/laughingstock"
-          echo "$APP_ENV" | ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "cat > ~/laughingstock/.env"
+          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "mkdir -p ~/laughingstock2"
+          echo "$APP_ENV" | ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "cat > ~/laughingstock2/.env"
 
       - name: Build and Restart Application on VPS
         run: |
           ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
           set -e
-          cd ~/laughingstock
+          cd ~/laughingstock2
 
           # Ensure PM2 is installed globally
           if ! command -v pm2 &> /dev/null; then
@@ -61,10 +61,10 @@ jobs:
           npx prisma db push
           npm run build
 
-          if pm2 list | grep -q "laughingstock"; then
-            pm2 restart laughingstock
+          if pm2 list | grep -q "laughingstock2"; then
+            pm2 restart laughingstock2
           else
-            pm2 start npm --name "laughingstock" -- start
+            pm2 start npm --name "laughingstock2" -- start
           fi
           pm2 save
           ENDSSH
