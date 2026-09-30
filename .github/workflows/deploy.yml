@@ -2,22 +2,69 @@ name: Deploy LaughingStock to VPS
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: SSH and Deploy to VPS
-        uses: appleboy/ssh-action@master
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /var/www/LaughingStock
-            git pull origin main
-            npm install
-            npx prisma db push
-            npm run build
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Sync Source Code to VPS
+        run: |
+          rsync -avz --delete \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.git' \
+            --exclude='.DS_Store' \
+            . ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}:~/laughingstock/
+
+      - name: Write Production Environment Variables
+        env:
+          APP_ENV: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            JEV_API_ENDPOINT=${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
+        run: |
+          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "mkdir -p ~/laughingstock"
+          echo "$APP_ENV" | ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} "cat > ~/laughingstock/.env"
+
+      - name: Build and Restart Application on VPS
+        run: |
+          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          cd ~/laughingstock
+
+          # Ensure PM2 is installed globally
+          if ! command -v pm2 &> /dev/null; then
+            npm install -g pm2
+          fi
+
+          # Install dependencies, run Prisma migrations, build Next.js, restart PM2 process
+          npm ci || npm install
+          npx prisma db push
+          npm run build
+
+          if pm2 list | grep -q "laughingstock"; then
             pm2 restart laughingstock
+          else
+            pm2 start npm --name "laughingstock" -- start
+          fi
+          pm2 save
+          ENDSSH
