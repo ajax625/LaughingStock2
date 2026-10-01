@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import StockChart from '@/components/StockChart';
 import {
@@ -61,6 +61,16 @@ export default function Home() {
   const [loadingIntraday15m, setLoadingIntraday15m] = useState(false);
   const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const matchedCandRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isAssociationModalOpen && matchedCandRef.current) {
+      const timer = setTimeout(() => {
+        matchedCandRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [isAssociationModalOpen, selectedRange]);
 
   const fetchIntraday15m = useCallback(async (symbol: string, startDate: string, endDate: string) => {
     setLoadingIntraday15m(true);
@@ -1446,10 +1456,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* Conviction Day Association Popup Modal (Compact & Translucent) */}
+      {/* Conviction Day Association Popup Modal (Compact 35% Transparent / Auto-Scrolled) */}
       {isAssociationModalOpen && selectedRange && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
-          <div className="bg-card/95 border border-emerald-500/60 rounded-xl max-w-sm w-full p-4 shadow-[0_0_30px_rgba(0,255,135,0.25)] space-y-3 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-emerald-500/60 rounded-xl max-w-sm w-full p-4 shadow-[0_0_30px_rgba(0,255,135,0.25)] space-y-3 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b border-border pb-2.5">
               <div>
                 <h3 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
@@ -1467,50 +1477,59 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="max-h-[240px] overflow-y-auto space-y-1.5 pr-1">
-              {researchData?.candidates && researchData.candidates.length > 0 ? (
-                researchData.candidates.map((cand: any) => {
-                  const isInsideRange = cand.date >= selectedRange.startDate && cand.date <= selectedRange.endDate;
-                  const isVerified = verifiedRanges[cand.date];
-                  return (
-                    <div
-                      key={cand.date}
-                      className={`p-2.5 rounded-lg border flex items-center justify-between text-xs transition ${
-                        isInsideRange
-                          ? 'bg-emerald-500/15 border-emerald-500/60 shadow-[0_0_10px_rgba(0,255,135,0.15)]'
-                          : 'bg-background/80 border-border hover:border-emerald-500/30'
-                      }`}
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 font-mono">
-                          <span className="font-bold text-amber-400">{cand.date}</span>
-                          {isInsideRange && (
-                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-sans font-bold">
-                              Matched
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-muted font-mono flex items-center gap-2">
-                          <span>RVOL: <strong className="text-amber-400">{cand.rvol}x</strong></span>
-                          <span>Range: <strong className="text-purple-400">{cand.rangePct}%</strong></span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => saveDatasetDirectly(cand)}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] px-3 py-1.5 rounded-lg shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+            <div className="max-h-[240px] overflow-y-auto space-y-1.5 pr-1 scroll-smooth">
+              {(() => {
+                let firstMatched = false;
+                return researchData?.candidates && researchData.candidates.length > 0 ? (
+                  researchData.candidates.map((cand: any) => {
+                    const isInsideRange = cand.date >= selectedRange.startDate && cand.date <= selectedRange.endDate;
+                    const isVerified = verifiedRanges[cand.date];
+                    let isRefTarget = false;
+                    if (isInsideRange && !firstMatched) {
+                      isRefTarget = true;
+                      firstMatched = true;
+                    }
+                    return (
+                      <div
+                        key={cand.date}
+                        ref={isRefTarget ? matchedCandRef : null}
+                        className={`p-2.5 rounded-lg border flex items-center justify-between text-xs transition ${
+                          isInsideRange
+                            ? 'bg-emerald-500/20 border-emerald-500/70 shadow-[0_0_12px_rgba(0,255,135,0.2)] font-bold'
+                            : 'bg-background/80 border-border hover:border-emerald-500/30'
+                        }`}
                       >
-                        {isVerified ? '✓ Saved' : '+ Save'}
-                      </button>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="p-4 text-center text-muted text-xs italic">
-                  No conviction days flagged. Lower parameters to find candidates.
-                </div>
-              )}
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 font-mono">
+                            <span className="font-bold text-amber-400">{cand.date}</span>
+                            {isInsideRange && (
+                              <span className="text-[9px] bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-sans font-extrabold">
+                                Matched
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-muted font-mono flex items-center gap-2">
+                            <span>RVOL: <strong className="text-amber-400">{cand.rvol}x</strong></span>
+                            <span>Range: <strong className="text-purple-400">{cand.rangePct}%</strong></span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => saveDatasetDirectly(cand)}
+                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] px-3 py-1.5 rounded-lg shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+                        >
+                          {isVerified ? '✓ Saved' : '+ Save'}
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-center text-muted text-xs italic">
+                    No conviction days flagged. Lower parameters to find candidates.
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="pt-2 border-t border-border flex justify-end">
