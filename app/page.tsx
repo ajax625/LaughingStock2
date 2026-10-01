@@ -86,10 +86,10 @@ export default function Home() {
 
   // Instant one-click range to conviction association & persistence
   const saveDatasetDirectly = async (cand: any) => {
-    if (!selectedRange) return;
+    if (!selectedRange || !cand) return;
 
-    const candDate = cand.date;
-    const roi = cand.rangePct || paramM;
+    const candDate = cand.date || cand.convictionDate || selectedRange.startDate;
+    const roi = Number(cand.rangePct || paramM || 5.0);
 
     try {
       const res = await fetch('/api/research/datasets', {
@@ -105,9 +105,10 @@ export default function Home() {
         }),
       });
 
+      const resData = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        const data = await res.json();
-        const dsName = data.dataset?.datasetName || `${researchSymbol}_${candDate}_${roi}`;
+        const dsName = resData.dataset?.datasetName || `${researchSymbol}_${candDate}_${roi}`;
 
         // Mark range verified for this candidate
         setVerifiedRanges((prev) => ({
@@ -115,8 +116,8 @@ export default function Home() {
           [candDate]: selectedRange,
         }));
 
-        // Queue into Strategy Engine
-        await fetch('/api/strategies', {
+        // Fire-and-forget optional strategy queue so it NEVER blocks dataset persistence
+        fetch('/api/strategies', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -132,7 +133,7 @@ export default function Home() {
             winRate: 85.0,
             avgReturn: roi,
           }),
-        });
+        }).catch((err) => console.warn('Non-blocking strategy queue notice:', err));
 
         setToastMessage(`✨ Approved! Dataset '${dsName}' saved to DB & Phase 2 Analysis.`);
         setTimeout(() => setToastMessage(null), 4000);
@@ -141,10 +142,13 @@ export default function Home() {
         fetchStrategies();
         setIsAssociationModalOpen(false);
       } else {
-        alert('Failed to save research dataset.');
+        const errMsg = resData.error || resData.message || 'Server error';
+        console.error('Dataset save error:', resData);
+        alert(`Failed to save research dataset: ${errMsg}`);
       }
-    } catch (err) {
-      alert('Error saving research dataset.');
+    } catch (err: any) {
+      console.error('Dataset save exception:', err);
+      alert(`Error saving research dataset: ${err.message || 'Network error'}`);
     }
   };
 

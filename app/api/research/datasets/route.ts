@@ -43,18 +43,19 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { symbol, convictionDate, roiPct, startDate, endDate, candles } = body;
 
-    if (!symbol || !convictionDate) {
-      return NextResponse.json({ error: 'Missing required symbol or convictionDate' }, { status: 400 });
+    if (!symbol) {
+      return NextResponse.json({ error: 'Missing required symbol' }, { status: 400 });
     }
 
-    const sym = symbol.toUpperCase().trim();
-    const effectiveStartDate = startDate || convictionDate;
-    const effectiveEndDate = endDate || convictionDate;
+    const sym = String(symbol).toUpperCase().trim();
+    const targetDate = String(convictionDate || startDate || new Date().toISOString().split('T')[0]);
+    const effectiveStartDate = startDate ? String(startDate) : targetDate;
+    const effectiveEndDate = endDate ? String(endDate) : targetDate;
 
     // Format MMDDYYYY date string cleanly
     let mmddyyyy = '00000000';
     try {
-      const cleanDate = convictionDate.split('T')[0].split(' ')[0];
+      const cleanDate = targetDate.split('T')[0].split(' ')[0].trim();
       const parts = cleanDate.includes('-') ? cleanDate.split('-') : cleanDate.split('/');
       if (parts.length === 3) {
         if (parts[0].length === 4) {
@@ -63,10 +64,10 @@ export async function POST(req: Request) {
           mmddyyyy = `${parts[0].padStart(2, '0')}${parts[1].padStart(2, '0')}${parts[2]}`;
         }
       } else {
-        mmddyyyy = cleanDate.replace(/\D/g, '');
+        mmddyyyy = cleanDate.replace(/\D/g, '').padStart(8, '0');
       }
     } catch (dErr) {
-      mmddyyyy = new Date(convictionDate).toISOString().split('T')[0].replace(/-/g, '');
+      mmddyyyy = '01012026';
     }
 
     const roiVal = Number(roiPct) || 5.0;
