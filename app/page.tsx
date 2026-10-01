@@ -71,14 +71,46 @@ export default function Home() {
 
   // Verified Ranges per Conviction Day: Record<convictionDate, { startDate: string; endDate: string; candleCount: number }>
   const [verifiedRanges, setVerifiedRanges] = useState<Record<string, { startDate: string; endDate: string; candleCount: number }>>({});
+  const [savedDatasets, setSavedDatasets] = useState<any[]>([]);
   const [isSubmittingResearch, setIsSubmittingResearch] = useState(false);
 
-  const attachRangeToCandidate = (candDate: string) => {
+  const fetchSavedDatasets = useCallback(async () => {
+    try {
+      const res = await fetch('/api/research/datasets');
+      if (res.ok) {
+        const data = await res.json();
+        setSavedDatasets(data.datasets || []);
+      }
+    } catch (err) {
+      console.error('Failed to load saved datasets:', err);
+    }
+  }, []);
+
+  const attachRangeToCandidate = async (candDate: string, candObj?: any) => {
     if (!selectedRange) return;
     setVerifiedRanges((prev) => ({
       ...prev,
       [candDate]: selectedRange,
     }));
+
+    const roi = candObj?.rangePct || paramM;
+    try {
+      await fetch('/api/research/datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: researchSymbol,
+          convictionDate: candDate,
+          roiPct: roi,
+          startDate: selectedRange.startDate,
+          endDate: selectedRange.endDate,
+          candles: intraday15mResult?.candles || [],
+        }),
+      });
+      fetchSavedDatasets();
+    } catch (err) {
+      console.error('Failed to auto-save research dataset:', err);
+    }
   };
 
   const removeRangeFromCandidate = (candDate: string) => {
@@ -96,6 +128,25 @@ export default function Home() {
     setIsSubmittingResearch(true);
     try {
       for (const [candDate, range] of verifiedEntries) {
+        // Find corresponding candidate object for ROI %
+        const candObj = researchData?.candidates?.find((c: any) => c.date === candDate);
+        const roi = candObj?.rangePct || paramM;
+
+        // 1. Save Named Research Dataset in DB (e.g. AAPL_09102026_5_2)
+        await fetch('/api/research/datasets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: researchSymbol,
+            convictionDate: candDate,
+            roiPct: roi,
+            startDate: range.startDate,
+            endDate: range.endDate,
+            candles: intraday15mResult?.candles || [],
+          }),
+        });
+
+        // 2. Queue into Strategy Engine
         await fetch('/api/strategies', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -110,13 +161,13 @@ export default function Home() {
             jevPrompt: `Perform JEV 15m intraday action evaluation for ${researchSymbol} between ${range.startDate} and ${range.endDate}`,
             actionScores: { BUY: 0.88, HOLD: 0.08, SELL: 0.04 },
             winRate: 85.0,
-            avgReturn: 5.2,
+            avgReturn: roi,
           }),
         });
       }
-      alert(`Successfully added ${verifiedEntries.length} verified conviction day(s) with 15m intraday research ranges to Phase 2 Analysis & Strategy Engine!`);
+      alert(`Successfully approved and persisted ${verifiedEntries.length} 15m research dataset(s) (e.g., ${researchSymbol}_MMDDYYYY_X) to the database and strategy engine!`);
+      fetchSavedDatasets();
       fetchStrategies();
-      setActiveTab('signals');
     } catch (err) {
       alert('Failed to submit research entries.');
     } finally {
@@ -169,8 +220,9 @@ export default function Home() {
   useEffect(() => {
     fetchPortfolio();
     fetchStrategies();
+    fetchSavedDatasets();
     runMiner('NVDA');
-  }, []);
+  }, [fetchSavedDatasets]);
 
   useEffect(() => {
     fetchResearch(researchSymbol);
@@ -863,7 +915,7 @@ export default function Home() {
                           ) : selectedRange ? (
                             <button
                               type="button"
-                              onClick={() => attachRangeToCandidate(cand.date)}
+                              onClick={() => attachRangeToCandidate(cand.date, cand)}
                               className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-xs px-2.5 py-1 rounded font-bold hover:bg-cyan-500/30 transition"
                             >
                               + Attach Range ({selectedRange.startDate} - {selectedRange.endDate})
@@ -897,6 +949,106 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Approved Research Datasets & Potential Candidates Panel */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
+              <div>
+                <h3 className="font-bold text-md text-emerald-400 flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5 text-emerald-400" /> Approved Research Datasets & Candidates ({savedDatasets.length})
+                </h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Named 15m intraday datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) approved for research and persisted to database.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchSavedDatasets}
+                className="text-xs bg-background border border-border text-muted hover:text-foreground px-3 py-1.5 rounded-lg font-semibold cursor-pointer"
+              >
+                Refresh Datasets
+              </button>
+            </div>
+
+            {savedDatasets.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted border-b border-border uppercase">
+                    <tr>
+                      <th className="pb-3">Dataset Name</th>
+                      <th className="pb-3">Symbol</th>
+                      <th className="pb-3">Conviction Date</th>
+                      <th className="pb-3">ROI / Range %</th>
+                      <th className="pb-3">15m Date Range</th>
+                      <th className="pb-3">Bars Saved</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border font-medium">
+                    {savedDatasets.map((ds: any) => (
+                      <tr key={ds.id} className="hover:bg-background/50 transition">
+                        <td className="py-3 font-mono font-bold text-amber-400">
+                          <span className="bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded text-xs">
+                            {ds.datasetName}
+                          </span>
+                        </td>
+                        <td className="font-bold">{ds.symbol}</td>
+                        <td className="text-xs text-muted">{ds.convictionDate}</td>
+                        <td className="text-purple-400 font-bold">{ds.roiPct.toFixed(1)}%</td>
+                        <td className="text-xs font-mono">{ds.startDate} → {ds.endDate}</td>
+                        <td className="text-xs text-cyan-400 font-bold">{ds.barCount} bars (15m)</td>
+                        <td>
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-bold">
+                            🟢 {ds.status}
+                          </span>
+                        </td>
+                        <td className="text-right py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fetchIntraday15m(ds.symbol, ds.startDate, ds.endDate)}
+                              className="text-xs bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-2.5 py-1 rounded font-semibold hover:bg-cyan-600/30 cursor-pointer"
+                            >
+                              Inspect 15m Bars
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMinerSymbol(ds.symbol);
+                                setActiveTab('miner');
+                                runMiner(ds.symbol);
+                              }}
+                              className="text-xs bg-purple-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-purple-700 shadow cursor-pointer"
+                            >
+                              Mine Fingerprint →
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (confirm(`Delete dataset ${ds.datasetName}?`)) {
+                                  await fetch(`/api/research/datasets?id=${ds.id}`, { method: 'DELETE' });
+                                  fetchSavedDatasets();
+                                }
+                              }}
+                              className="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-2 py-1 rounded border border-rose-500/30 cursor-pointer"
+                              title="Delete Dataset"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted text-xs italic">
+                No approved research datasets persisted yet. Select a 15m range on the chart and click "+ Attach Range" on a conviction candidate above to generate a dataset!
+              </div>
+            )}
           </div>
         </section>
       )}

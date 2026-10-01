@@ -104,3 +104,19 @@ model MarketCandle {
   @@unique([symbol, interval, timestamp])
   @@index([symbol, timestamp])
 }
+
+model ResearchDataset {
+  id             String   @id @default(cuid())
+  datasetName    String   @unique
+  symbol         String
+  convictionDate String
+  roiPct         Float
+  startDate      String
+  endDate        String
+  barCount       Int
+  status         String   @default("APPROVED_FOR_RESEARCH")
+  candles        Json
+  createdAt      DateTime @default(now())
+
+  @@index([symbol])
+}
