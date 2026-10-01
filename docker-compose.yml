@@ -22,6 +22,8 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    ports:
+      - "9999:9999"
     environment:
       PORT: "9999"
     env_file:

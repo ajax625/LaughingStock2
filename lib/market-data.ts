@@ -118,19 +118,21 @@ export async function getStockCandles(
 
     // 2. Efficient Batch Persistence into PostgreSQL 'MarketCandle' Table (Single SQL Query)
     try {
-      await prisma.marketCandle.createMany({
-        data: validCandles.map((c) => ({
-          symbol: sym,
-          interval: interval,
-          timestamp: new Date(c.date),
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          volume: BigInt(c.volume),
-        })),
-        skipDuplicates: true,
+      const records = validCandles.map((c) => ({
+        symbol: sym,
+        interval: interval,
+        timestamp: new Date(c.date),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: BigInt(c.volume),
       }));
+
+      await prisma.marketCandle.createMany({
+        data: records,
+        skipDuplicates: true,
+      });
     } catch (dbErr) {
       console.error(`PostgreSQL MarketCandle bulk insert error for ${sym}:`, dbErr);
     }
