@@ -34,6 +34,22 @@ export async function createStrategy(data: {
   avgReturn: number;
 }) {
   try {
+    // Ensure creator user exists in DB to prevent foreign key constraint failure
+    try {
+      await prisma.user.upsert({
+        where: { id: data.creatorId },
+        update: {},
+        create: {
+          id: data.creatorId,
+          email: `${data.creatorId}@laughingstock.app`,
+          password: 'hashed_password_demo',
+          name: 'Demo Trader',
+        },
+      });
+    } catch (uErr) {
+      console.warn('User upsert warning in createStrategy:', uErr);
+    }
+
     const strategy = await prisma.strategy.create({
       data: {
         symbol: data.symbol.toUpperCase(),

@@ -23,29 +23,51 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { symbol, convictionDate, roiPct, startDate, endDate, candles } = body;
 
-    if (!symbol || !convictionDate || !startDate || !endDate) {
-      return NextResponse.json({ error: 'Missing required dataset fields' }, { status: 400 });
+    if (!symbol || !convictionDate) {
+      return NextResponse.json({ error: 'Missing required symbol or convictionDate' }, { status: 400 });
     }
 
     const sym = symbol.toUpperCase().trim();
-    // Format convictionDate "YYYY-MM-DD" to "MMDDYYYY"
-    const [y, m, d] = convictionDate.split('T')[0].split('-');
-    const mmddyyyy = `${m}${d}${y}`;
-    const roiStr = (roiPct || 0).toFixed(1).replace('.', '_');
+    const effectiveStartDate = startDate || convictionDate;
+    const effectiveEndDate = endDate || convictionDate;
+
+    // Bulletproof MMDDYYYY date formatter
+    let mmddyyyy = '00000000';
+    try {
+      const cleanDate = convictionDate.split('T')[0].split(' ')[0];
+      const parts = cleanDate.includes('-') ? cleanDate.split('-') : cleanDate.split('/');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          mmddyyyy = `${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}${parts[0]}`;
+        } else {
+          // MM/DD/YYYY
+          mmddyyyy = `${parts[0].padStart(2, '0')}${parts[1].padStart(2, '0')}${parts[2]}`;
+        }
+      } else {
+        mmddyyyy = cleanDate.replace(/\D/g, '');
+      }
+    } catch (dErr) {
+      mmddyyyy = new Date(convictionDate).toISOString().split('T')[0].replace(/-/g, '');
+    }
+
+    const roiVal = Number(roiPct) || 5.0;
+    const roiStr = roiVal.toFixed(1).replace('.', '_');
     
     // Dataset Name format: e.g. AAPL_09102026_5_2
     const datasetName = `${sym}_${mmddyyyy}_${roiStr}`;
-
     const validCandles = Array.isArray(candles) ? candles : [];
+
+    console.log(`[DB RESEARCH DATASET] Upserting dataset '${datasetName}' for ${sym} (Candles: ${validCandles.length})...`);
 
     const dataset = await prisma.researchDataset.upsert({
       where: { datasetName },
       update: {
         symbol: sym,
         convictionDate,
-        roiPct: Number(roiPct || 0),
-        startDate,
-        endDate,
+        roiPct: roiVal,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
         barCount: validCandles.length,
         status: 'APPROVED_FOR_RESEARCH',
         candles: validCandles,
@@ -54,14 +76,16 @@ export async function POST(req: Request) {
         datasetName,
         symbol: sym,
         convictionDate,
-        roiPct: Number(roiPct || 0),
-        startDate,
-        endDate,
+        roiPct: roiVal,
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
         barCount: validCandles.length,
         status: 'APPROVED_FOR_RESEARCH',
         candles: validCandles,
       },
     });
+
+    console.log(`[DB RESEARCH DATASET SUCCESS] Created/Updated dataset '${dataset.datasetName}' with ID ${dataset.id}`);
 
     // Also persist 15m candles into MarketCandle table for historical indexing
     if (validCandles.length > 0) {
@@ -70,10 +94,10 @@ export async function POST(req: Request) {
           symbol: sym,
           interval: '15m',
           timestamp: new Date(c.date),
-          open: Number(c.open),
-          high: Number(c.high),
-          low: Number(c.low),
-          close: Number(c.close),
+          open: Number(c.open || 0),
+          high: Number(c.high || 0),
+          low: Number(c.low || 0),
+          close: Number(c.close || 0),
           volume: BigInt(Math.round(c.volume || 0)),
         }));
 
@@ -91,7 +115,7 @@ export async function POST(req: Request) {
       dataset,
     });
   } catch (err: any) {
-    console.error('Failed to create research dataset:', err);
+    console.error('Failed to create research dataset in DB:', err?.message || err);
     return NextResponse.json({ error: err.message || 'Failed to save dataset' }, { status: 500 });
   }
 }

@@ -93,9 +93,22 @@ export default function Home() {
       [candDate]: selectedRange,
     }));
 
+    let candlesToSave = intraday15mResult?.candles || [];
+    if (candlesToSave.length === 0) {
+      try {
+        const cRes = await fetch(`/api/research/${researchSymbol}/intraday?startDate=${selectedRange.startDate}&endDate=${selectedRange.endDate}`);
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          candlesToSave = cData.candles || [];
+        }
+      } catch (e) {
+        console.warn('Pre-fetch 15m bars warning:', e);
+      }
+    }
+
     const roi = candObj?.rangePct || paramM;
     try {
-      await fetch('/api/research/datasets', {
+      const res = await fetch('/api/research/datasets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,9 +117,14 @@ export default function Home() {
           roiPct: roi,
           startDate: selectedRange.startDate,
           endDate: selectedRange.endDate,
-          candles: intraday15mResult?.candles || [],
+          candles: candlesToSave,
         }),
       });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        console.error('Failed to auto-save dataset:', errJson);
+      }
       fetchSavedDatasets();
     } catch (err) {
       console.error('Failed to auto-save research dataset:', err);
@@ -127,13 +145,27 @@ export default function Home() {
 
     setIsSubmittingResearch(true);
     try {
+      let savedCount = 0;
       for (const [candDate, range] of verifiedEntries) {
         // Find corresponding candidate object for ROI %
         const candObj = researchData?.candidates?.find((c: any) => c.date === candDate);
         const roi = candObj?.rangePct || paramM;
 
+        let candlesToSave = intraday15mResult?.candles || [];
+        if (candlesToSave.length === 0) {
+          try {
+            const cRes = await fetch(`/api/research/${researchSymbol}/intraday?startDate=${range.startDate}&endDate=${range.endDate}`);
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              candlesToSave = cData.candles || [];
+            }
+          } catch (e) {
+            console.warn('Failed to pre-fetch 15m bars during bulk add:', e);
+          }
+        }
+
         // 1. Save Named Research Dataset in DB (e.g. AAPL_09102026_5_2)
-        await fetch('/api/research/datasets', {
+        const dsRes = await fetch('/api/research/datasets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -142,9 +174,11 @@ export default function Home() {
             roiPct: roi,
             startDate: range.startDate,
             endDate: range.endDate,
-            candles: intraday15mResult?.candles || [],
+            candles: candlesToSave,
           }),
         });
+
+        if (dsRes.ok) savedCount++;
 
         // 2. Queue into Strategy Engine
         await fetch('/api/strategies', {
@@ -165,7 +199,7 @@ export default function Home() {
           }),
         });
       }
-      alert(`Successfully approved and persisted ${verifiedEntries.length} 15m research dataset(s) (e.g., ${researchSymbol}_MMDDYYYY_X) to the database and strategy engine!`);
+      alert(`Successfully approved and persisted ${savedCount} 15m research dataset(s) (e.g., ${researchSymbol}_MMDDYYYY_X) to the database and strategy engine!`);
       fetchSavedDatasets();
       fetchStrategies();
     } catch (err) {
