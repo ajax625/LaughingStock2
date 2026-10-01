@@ -126,15 +126,16 @@ export async function getStockCandles(
         high: c.high,
         low: c.low,
         close: c.close,
-        volume: BigInt(c.volume),
+        volume: BigInt(Math.round(c.volume || 0)),
       }));
 
-      await prisma.marketCandle.createMany({
+      const res = await prisma.marketCandle.createMany({
         data: records,
         skipDuplicates: true,
       });
-    } catch (dbErr) {
-      console.error(`PostgreSQL MarketCandle bulk insert error for ${sym}:`, dbErr);
+      console.log(`[DB SUCCESS] Created ${res.count} MarketCandles in PostgreSQL for ${sym}`);
+    } catch (dbErr: any) {
+      console.error(`[DB ERROR] PostgreSQL MarketCandle bulk insert failed for ${sym}:`, dbErr?.message || dbErr);
     }
 
     return validCandles;
