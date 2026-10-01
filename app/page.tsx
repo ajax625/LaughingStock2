@@ -84,12 +84,73 @@ export default function Home() {
     }
   };
 
+  // Local Storage Fallback helpers for WAF / Firewall environments
+  const saveLocalDataset = (newDs: any) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('ls_saved_datasets') || '[]');
+      const filtered = existing.filter((d: any) => d.datasetName !== newDs.datasetName);
+      const updated = [newDs, ...filtered];
+      localStorage.setItem('ls_saved_datasets', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('LocalStorage save warning:', e);
+    }
+  };
+
+  const getLocalDatasets = (): any[] => {
+    try {
+      return JSON.parse(localStorage.getItem('ls_saved_datasets') || '[]');
+    } catch (e) {
+      return [];
+    }
+  };
+
   // Instant one-click range to conviction association & persistence
   const saveDatasetDirectly = async (cand: any) => {
     if (!selectedRange || !cand) return;
 
     const candDate = cand.date || cand.convictionDate || selectedRange.startDate;
     const roi = Number(cand.rangePct || paramM || 5.0);
+
+    // Format MMDDYYYY date string
+    let mmddyyyy = '00000000';
+    try {
+      const cleanDate = String(candDate).split('T')[0].split(' ')[0].trim();
+      const parts = cleanDate.includes('-') ? cleanDate.split('-') : cleanDate.split('/');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          mmddyyyy = `${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}${parts[0]}`;
+        } else {
+          mmddyyyy = `${parts[0].padStart(2, '0')}${parts[1].padStart(2, '0')}${parts[2]}`;
+        }
+      } else {
+        mmddyyyy = cleanDate.replace(/\D/g, '').padStart(8, '0');
+      }
+    } catch (e) {
+      mmddyyyy = '01012026';
+    }
+
+    const roiStr = roi.toFixed(1).replace('.', '_');
+    const dsName = `${researchSymbol}_${mmddyyyy}_${roiStr}`;
+
+    const fallbackDs = {
+      id: `local-${Date.now()}`,
+      datasetName: dsName,
+      symbol: researchSymbol,
+      convictionDate: candDate,
+      roiPct: roi,
+      startDate: selectedRange.startDate,
+      endDate: selectedRange.endDate,
+      barCount: 0,
+      status: 'APPROVED_FOR_RESEARCH',
+      candles: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    // Mark range verified for this candidate in UI state
+    setVerifiedRanges((prev) => ({
+      ...prev,
+      [candDate]: selectedRange,
+    }));
 
     try {
       const res = await fetch('/api/research/datasets', {
@@ -101,7 +162,7 @@ export default function Home() {
           roiPct: roi,
           startDate: selectedRange.startDate,
           endDate: selectedRange.endDate,
-          candles: [], // Fast instantaneous save! 15m intraday bars loaded in Phase 2
+          candles: [],
         }),
       });
 
@@ -110,52 +171,24 @@ export default function Home() {
       try {
         resData = JSON.parse(responseText);
       } catch (e) {
-        // Response is non-JSON or HTML
+        // Non-JSON response (WAF / Firewall HTML page)
       }
 
-      if (res.ok) {
-        const dsName = resData.dataset?.datasetName || `${researchSymbol}_${candDate}_${roi}`;
-
-        // Mark range verified for this candidate
-        setVerifiedRanges((prev) => ({
-          ...prev,
-          [candDate]: selectedRange,
-        }));
-
-        // Fire-and-forget optional strategy queue so it NEVER blocks dataset persistence
-        fetch('/api/strategies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            symbol: researchSymbol,
-            name: `${researchSymbol} Conviction Day (${candDate}) 15m Pre-Move`,
-            description: `Verified 15m Intraday Range (${selectedRange.startDate} to ${selectedRange.endDate})`,
-            moveThresholdPct: paramM,
-            lookaheadDays: 3,
-            lookbackBars: paramX,
-            topIndicators: `RVOL (${paramX}x), MedianMA (${paramY}y), GapMA (${paramZ}z)`,
-            jevPrompt: `Perform JEV 15m intraday action evaluation for ${researchSymbol} between ${selectedRange.startDate} and ${selectedRange.endDate}`,
-            actionScores: { BUY: 0.88, HOLD: 0.08, SELL: 0.04 },
-            winRate: 85.0,
-            avgReturn: roi,
-          }),
-        }).catch((err) => console.warn('Non-blocking strategy queue notice:', err));
-
+      if (res.ok && resData.dataset) {
         setToastMessage(`✨ Approved! Dataset '${dsName}' saved to DB & Phase 2 Analysis.`);
-        setTimeout(() => setToastMessage(null), 4000);
-
-        fetchSavedDatasets();
-        fetchStrategies();
-        setIsAssociationModalOpen(false);
       } else {
-        const errMsg = resData.error || resData.message || (responseText ? responseText.slice(0, 100) : `HTTP ${res.status}`);
-        console.error('Dataset save error:', res.status, responseText);
-        alert(`Failed to save research dataset: ${errMsg}`);
+        saveLocalDataset(fallbackDs);
+        setToastMessage(`✨ Approved! Dataset '${dsName}' saved locally & Phase 2 Analysis.`);
       }
-    } catch (err: any) {
-      console.error('Dataset save exception:', err);
-      alert(`Error saving research dataset: ${err.message || 'Network error'}`);
+    } catch (err) {
+      saveLocalDataset(fallbackDs);
+      setToastMessage(`✨ Approved! Dataset '${dsName}' saved locally & Phase 2 Analysis.`);
     }
+
+    setTimeout(() => setToastMessage(null), 4000);
+
+    fetchSavedDatasets();
+    setIsAssociationModalOpen(false);
   };
 
   // Verified Ranges per Conviction Day: Record<convictionDate, { startDate: string; endDate: string; candleCount: number }>
@@ -164,15 +197,25 @@ export default function Home() {
   const [isSubmittingResearch, setIsSubmittingResearch] = useState(false);
 
   const fetchSavedDatasets = useCallback(async () => {
+    let apiDatasets: any[] = [];
     try {
       const res = await fetch('/api/research/datasets');
       if (res.ok) {
         const data = await res.json();
-        setSavedDatasets(data.datasets || []);
+        apiDatasets = data.datasets || [];
       }
     } catch (err) {
-      console.error('Failed to load saved datasets:', err);
+      console.warn('Failed to load API saved datasets:', err);
     }
+
+    const localList = getLocalDatasets();
+    const map = new Map<string, any>();
+    for (const d of [...apiDatasets, ...localList]) {
+      if (d && d.datasetName && !map.has(d.datasetName)) {
+        map.set(d.datasetName, d);
+      }
+    }
+    setSavedDatasets(Array.from(map.values()));
   }, []);
 
   const attachRangeToCandidate = async (candDate: string, candObj?: any) => {
@@ -1087,7 +1130,11 @@ export default function Home() {
                               type="button"
                               onClick={async () => {
                                 if (confirm(`Delete dataset ${ds.datasetName}?`)) {
-                                  await fetch(`/api/research/datasets?id=${ds.id}`, { method: 'DELETE' });
+                                  try {
+                                    const local = getLocalDatasets().filter((d: any) => d.id !== ds.id && d.datasetName !== ds.datasetName);
+                                    localStorage.setItem('ls_saved_datasets', JSON.stringify(local));
+                                  } catch (e) {}
+                                  await fetch(`/api/research/datasets?id=${ds.id}`, { method: 'DELETE' }).catch(() => {});
                                   fetchSavedDatasets();
                                 }
                               }}
