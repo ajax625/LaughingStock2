@@ -24,7 +24,12 @@ jobs:
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
       - name: Sync Source Code to VPS
+        env:
+          VPS_USER_SECRET: ${{ secrets.VPS_USER }}
+          VPS_HOST_SECRET: ${{ secrets.VPS_HOST }}
         run: |
+          VPS_USER="${VPS_USER_SECRET:-root}"
+          VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
           rsync -avz --delete \
             --exclude='node_modules' \
             --exclude='.next' \
@@ -32,10 +37,12 @@ jobs:
             --exclude='.env.*' \
             --exclude='.git' \
             --exclude='.DS_Store' \
-            . ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST || '45.132.240.168' }}:~/laughingstock2/
+            . "$VPS_USER@$VPS_HOST:~/laughingstock2/"
 
       - name: Write Production Environment Variables
         env:
+          VPS_USER_SECRET: ${{ secrets.VPS_USER }}
+          VPS_HOST_SECRET: ${{ secrets.VPS_HOST }}
           APP_ENV: |
             POSTGRES_USER=${{ secrets.POSTGRES_USER || 'laughingstock' }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || 'laughingstockpass123' }}
@@ -45,12 +52,19 @@ jobs:
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
             JEV_API_ENDPOINT=${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
         run: |
-          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST || '45.132.240.168' }} "mkdir -p ~/laughingstock2"
-          echo "$APP_ENV" | ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST || '45.132.240.168' }} "cat > ~/laughingstock2/.env"
+          VPS_USER="${VPS_USER_SECRET:-root}"
+          VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
+          ssh "$VPS_USER@$VPS_HOST" "mkdir -p ~/laughingstock2"
+          echo "$APP_ENV" | ssh "$VPS_USER@$VPS_HOST" "cat > ~/laughingstock2/.env"
 
       - name: Build and Start Containers via Docker Compose
+        env:
+          VPS_USER_SECRET: ${{ secrets.VPS_USER }}
+          VPS_HOST_SECRET: ${{ secrets.VPS_HOST }}
         run: |
-          ssh ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST || '45.132.240.168' }} << 'ENDSSH'
+          VPS_USER="${VPS_USER_SECRET:-root}"
+          VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
+          ssh "$VPS_USER@$VPS_HOST" << 'ENDSSH'
           set -e
           cd ~/laughingstock2
 
