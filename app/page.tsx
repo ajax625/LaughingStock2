@@ -33,10 +33,10 @@ export default function Home() {
 
   // Research Ticker State & Conviction Parameters (x, y, z, V_min, M)
   const [researchSymbol, setResearchSymbol] = useState('INTC');
-  const [paramX, setParamX] = useState(20);
+  const [paramX, setParamX] = useState(15);
   const [paramVmin, setParamVmin] = useState(1.3);
-  const [paramY, setParamY] = useState(1);
-  const [paramM, setParamM] = useState(3.5);
+  const [paramY, setParamY] = useState(3);
+  const [paramM, setParamM] = useState(5.0);
   const [paramZ, setParamZ] = useState(20);
   const [researchData, setResearchData] = useState<any>(null);
 
@@ -650,80 +650,178 @@ export default function Home() {
 
             {/* Configurable Parameter Control Panel (x, y, z, V_min, M) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-1">
-              <div className="bg-background p-3 rounded-lg border border-border">
-                <label className="text-xs text-amber-400 font-bold block mb-1">Volume MA Window (x)</label>
-                <div className="flex items-center gap-2">
+              {/* 1. Volume MA (x) - Step 1, Default 15 */}
+              <div className="bg-background p-3 rounded-lg border border-border space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-amber-400 font-bold block">Volume MA (x)</label>
+                  <span className="text-[10px] text-muted">bars</span>
+                </div>
+                <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setParamX((prev) => Math.max(5, prev - 1))}
+                    className="w-8 h-8 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-extrabold text-lg flex items-center justify-center border border-amber-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Decrease Volume MA by 1"
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     value={paramX}
                     onChange={(e) => setParamX(Number(e.target.value))}
                     min="5"
                     max="50"
-                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-amber-400"
+                    step="1"
+                    className="w-full bg-transparent text-center font-bold text-amber-400 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs text-muted">bars</span>
+                  <button
+                    type="button"
+                    onClick={() => setParamX((prev) => Math.min(50, prev + 1))}
+                    className="w-8 h-8 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-extrabold text-lg flex items-center justify-center border border-amber-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Increase Volume MA by 1"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-background p-3 rounded-lg border border-border">
-                <label className="text-xs text-amber-400 font-bold block mb-1">RVOL Threshold (V_min)</label>
-                <div className="flex items-center gap-2">
+              {/* 2. RVOL Threshold (V_min) - Step 0.1, Default 1.3 */}
+              <div className="bg-background p-3 rounded-lg border border-border space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-amber-400 font-bold block">RVOL (V_min)</label>
+                  <span className="text-[10px] text-muted">mult</span>
+                </div>
+                <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setParamVmin((prev) => Math.max(1.0, Number((prev - 0.1).toFixed(1))))}
+                    className="w-8 h-8 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-extrabold text-lg flex items-center justify-center border border-amber-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Decrease RVOL by 0.1"
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     value={paramVmin}
                     onChange={(e) => setParamVmin(Number(e.target.value))}
                     step="0.1"
                     min="1.0"
-                    max="3.0"
-                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-amber-400"
+                    max="5.0"
+                    className="w-full bg-transparent text-center font-bold text-amber-400 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs text-muted">mult</span>
+                  <button
+                    type="button"
+                    onClick={() => setParamVmin((prev) => Math.min(5.0, Number((prev + 0.1).toFixed(1))))}
+                    className="w-8 h-8 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-extrabold text-lg flex items-center justify-center border border-amber-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Increase RVOL by 0.1"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-background p-3 rounded-lg border border-border">
-                <label className="text-xs text-cyan-400 font-bold block mb-1">Median Price MA (y)</label>
-                <div className="flex items-center gap-2">
+              {/* 3. Median Price MA (y) - Step 1, Default 3 */}
+              <div className="bg-background p-3 rounded-lg border border-border space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-cyan-400 font-bold block">Median Price MA (y)</label>
+                  <span className="text-[10px] text-muted">bars</span>
+                </div>
+                <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setParamY((prev) => Math.max(1, prev - 1))}
+                    className="w-8 h-8 rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-extrabold text-lg flex items-center justify-center border border-cyan-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Decrease Median Price MA by 1"
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     value={paramY}
                     onChange={(e) => setParamY(Number(e.target.value))}
                     min="1"
                     max="20"
-                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-cyan-400"
+                    step="1"
+                    className="w-full bg-transparent text-center font-bold text-cyan-400 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs text-muted">bars</span>
+                  <button
+                    type="button"
+                    onClick={() => setParamY((prev) => Math.min(20, prev + 1))}
+                    className="w-8 h-8 rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-extrabold text-lg flex items-center justify-center border border-cyan-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Increase Median Price MA by 1"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-background p-3 rounded-lg border border-border">
-                <label className="text-xs text-purple-400 font-bold block mb-1">Min Range % (M)</label>
-                <div className="flex items-center gap-2">
+              {/* 4. Min Range % (M) - Step 0.5, Default 5.0% */}
+              <div className="bg-background p-3 rounded-lg border border-border space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-purple-400 font-bold block">Min Range % (M)</label>
+                  <span className="text-[10px] text-muted">%</span>
+                </div>
+                <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setParamM((prev) => Math.max(1.0, Number((prev - 0.5).toFixed(1))))}
+                    className="w-8 h-8 rounded bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 font-extrabold text-lg flex items-center justify-center border border-purple-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Decrease Min Range % by 0.5"
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     value={paramM}
                     onChange={(e) => setParamM(Number(e.target.value))}
                     step="0.5"
                     min="1.0"
-                    max="10.0"
-                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-purple-400"
+                    max="15.0"
+                    className="w-full bg-transparent text-center font-bold text-purple-400 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs text-muted">%</span>
+                  <button
+                    type="button"
+                    onClick={() => setParamM((prev) => Math.min(15.0, Number((prev + 0.5).toFixed(1))))}
+                    className="w-8 h-8 rounded bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 font-extrabold text-lg flex items-center justify-center border border-purple-500/40 transition cursor-pointer select-none active:scale-95"
+                    title="Increase Min Range % by 0.5"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-background p-3 rounded-lg border border-border">
-                <label className="text-xs text-muted font-bold block mb-1">Gap MA Window (z)</label>
-                <div className="flex items-center gap-2">
+              {/* 5. Gap MA (z) - Step 1, Default 20 */}
+              <div className="bg-background p-3 rounded-lg border border-border space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-muted font-bold block">Gap MA Window (z)</label>
+                  <span className="text-[10px] text-muted">bars</span>
+                </div>
+                <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setParamZ((prev) => Math.max(5, prev - 1))}
+                    className="w-8 h-8 rounded bg-muted/20 hover:bg-muted/40 text-foreground font-extrabold text-lg flex items-center justify-center border border-border transition cursor-pointer select-none active:scale-95"
+                    title="Decrease Gap MA by 1"
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     value={paramZ}
                     onChange={(e) => setParamZ(Number(e.target.value))}
                     min="5"
                     max="50"
-                    className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-bold text-foreground"
+                    step="1"
+                    className="w-full bg-transparent text-center font-bold text-foreground text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs text-muted">bars</span>
+                  <button
+                    type="button"
+                    onClick={() => setParamZ((prev) => Math.min(50, prev + 1))}
+                    className="w-8 h-8 rounded bg-muted/20 hover:bg-muted/40 text-foreground font-extrabold text-lg flex items-center justify-center border border-border transition cursor-pointer select-none active:scale-95"
+                    title="Increase Gap MA by 1"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>

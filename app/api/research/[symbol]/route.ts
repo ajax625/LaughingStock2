@@ -15,11 +15,11 @@ export async function GET(
   const { searchParams } = new URL(req.url);
 
   // Conviction Detector Parameters (x, y, z, V_min, M)
-  const x = Number(searchParams.get('x') || 20);
-  const y = Number(searchParams.get('y') || 1);
+  const x = Number(searchParams.get('x') || 15);
+  const y = Number(searchParams.get('y') || 3);
   const z = Number(searchParams.get('z') || 20);
   const V_min = Number(searchParams.get('V_min') || 1.3);
-  const M = Number(searchParams.get('M') || 3.5);
+  const M = Number(searchParams.get('M') || 5.0);
 
   try {
     const quote = await getStockQuote(symbol);
