@@ -177,89 +177,105 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header / Navbar */}
-      <header className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen p-4 md:p-6 w-full max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-[5%]">
+      {/* Sidebar Navigation Tabs (15% Width) */}
+      <aside className="w-full lg:w-[15%] min-w-[220px] flex flex-col gap-5 shrink-0">
+        {/* Brand Header */}
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-2">
           <div className="bg-blue-600 text-white p-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md">
-            <TrendingUp className="w-6 h-6" />
-            <span className="text-xl tracking-tight">LaughingStock</span>
+            <TrendingUp className="w-5 h-5" />
+            <span className="text-lg tracking-tight font-extrabold">LaughingStock</span>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-foreground">Market Intelligence & Strategy Engine</h1>
-            <p className="text-xs text-muted">Typeface.ai JEV Signal Engine • Multi-User Trading Portal</p>
+            <h1 className="text-xs font-semibold text-foreground">Market Intelligence</h1>
+            <p className="text-[10px] text-muted">Typeface.ai JEV Signals</p>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex overflow-x-auto w-full md:w-auto border-b md:border-b-0 border-border gap-1 text-sm font-medium">
+        {/* Vertical Navigation Tabs */}
+        <nav className="bg-card border border-border rounded-xl p-2 shadow-sm flex flex-col gap-1.5 text-sm font-medium">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'dashboard' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+              activeTab === 'dashboard'
+                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
+                : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <TrendingUp className="w-4 h-4" /> Dashboard
+            <TrendingUp className="w-4 h-4 shrink-0" /> <span>Dashboard</span>
           </button>
           <button
             onClick={() => setActiveTab('portfolio')}
-            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'portfolio' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+              activeTab === 'portfolio'
+                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
+                : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Briefcase className="w-4 h-4" /> Portfolio
+            <Briefcase className="w-4 h-4 shrink-0" /> <span>Portfolio</span>
           </button>
           <button
             onClick={() => setActiveTab('research')}
-            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'research' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+              activeTab === 'research'
+                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
+                : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Search className="w-4 h-4" /> 🔬 Conviction Detector
+            <Search className="w-4 h-4 shrink-0" /> <span>Conviction Detector</span>
           </button>
           <button
             onClick={() => setActiveTab('miner')}
-            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'miner' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+              activeTab === 'miner'
+                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
+                : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <FlaskConical className="w-4 h-4" /> 🧠 Phase 2: Analysis
+            <FlaskConical className="w-4 h-4 shrink-0" /> <span>Phase 2: Analysis</span>
           </button>
           <button
             onClick={() => setActiveTab('signals')}
-            className={`px-4 py-2 flex items-center gap-2 border-b-2 transition ${
-              activeTab === 'signals' ? 'border-blue-500 text-blue-500 font-bold' : 'border-transparent text-muted hover:text-foreground'
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+              activeTab === 'signals'
+                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
+                : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Radio className="w-4 h-4" /> 📡 Phase 3: Monitoring
+            <Radio className="w-4 h-4 shrink-0" /> <span>Phase 3: Monitoring</span>
           </button>
         </nav>
 
-        {/* Cash & User Info */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border">
-          <div className="text-right">
-            <div className="text-xs text-muted">Available Cash</div>
-            <div className="text-sm font-bold text-emerald-500">
+        {/* Portfolio Cash & Account Controls */}
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3 mt-auto">
+          <div>
+            <div className="text-[11px] text-muted font-medium">Available Cash</div>
+            <div className="text-base font-extrabold text-emerald-500">
               ${portfolio ? portfolio.cash.toLocaleString() : '100,000.00'}
             </div>
           </div>
-          {session ? (
-            <button
-              onClick={() => signOut()}
-              className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-500/20"
-            >
-              <UserCheck className="w-3.5 h-3.5" /> {session.user?.name || 'User'}
-            </button>
-          ) : (
-            <button
-              onClick={() => signIn()}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold"
-            >
-              Sign In
-            </button>
-          )}
+          <div className="pt-2 border-t border-border">
+            {session ? (
+              <button
+                onClick={() => signOut()}
+                className="w-full flex items-center justify-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs px-3 py-2 rounded-lg font-bold hover:bg-blue-500/20"
+              >
+                <UserCheck className="w-3.5 h-3.5" /> {session.user?.name || 'User'}
+              </button>
+            ) : (
+              <button
+                onClick={() => signIn()}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-bold text-center"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </div>
-      </header>
+      </aside>
+
+      {/* Main Content Area (80% Width) */}
+      <main className="w-full lg:w-[80%] flex-1 space-y-6 min-w-0">
 
       {/* VIEW 1: DASHBOARD */}
       {activeTab === 'dashboard' && (
@@ -864,6 +880,7 @@ export default function Home() {
           </div>
         </section>
       )}
+      </main>
 
       {/* Trade Execution Modal */}
       {tradeModalOpen && (
