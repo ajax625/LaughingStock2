@@ -24,6 +24,21 @@ export default function Home() {
   // Tab State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'portfolio' | 'research' | 'miner' | 'signals'>('dashboard');
 
+  // UI Theme State ('dark' | 'light')
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    const savedTheme = (localStorage.getItem('ls_theme') as 'dark' | 'light') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  const toggleTheme = (newTheme: 'dark' | 'light') => {
+    setTheme(newTheme);
+    localStorage.setItem('ls_theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
+
   // Portfolio State
   const [portfolio, setPortfolio] = useState<any>(null);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
@@ -351,14 +366,47 @@ export default function Home() {
       {/* Sidebar Navigation Tabs (15% Width) */}
       <aside className="w-full lg:w-[15%] min-w-[220px] flex flex-col gap-5 shrink-0">
         {/* Brand Header */}
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-2">
-          <div className="bg-blue-600 text-white p-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md">
-            <TrendingUp className="w-5 h-5" />
-            <span className="text-lg tracking-tight font-extrabold">LaughingStock</span>
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-slate-950 border border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(0,255,135,0.3)]">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-black tracking-tight text-foreground">Laughing</span>
+                  <span className="text-lg font-black tracking-tight text-emerald-400 drop-shadow-[0_0_8px_rgba(0,255,135,0.5)]">Stock</span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit mt-0.5 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> JEV Engine v2.0
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xs font-semibold text-foreground">Market Intelligence</h1>
-            <p className="text-[10px] text-muted">Typeface.ai JEV Signals</p>
+
+          {/* Theme Switcher Toggle (☀️ Light / 🌙 Dark) */}
+          <div className="pt-2.5 border-t border-border flex justify-between items-center text-xs">
+            <span className="text-muted font-medium">Theme Mode</span>
+            <button
+              type="button"
+              onClick={() => toggleTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="bg-background border border-emerald-500/40 hover:border-emerald-400 text-emerald-400 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer text-xs"
+              title="Toggle Light / Dark Mode"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <span>🌙 Dark</span>
+                  <span className="text-[10px] bg-emerald-500/20 px-1.5 rounded text-emerald-300 font-bold">Navy/Neon</span>
+                </>
+              ) : (
+                <>
+                  <span>☀️ Light</span>
+                  <span className="text-[10px] bg-emerald-500/20 px-1.5 rounded text-emerald-600 font-bold">Porcelain</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -369,55 +417,55 @@ export default function Home() {
             onClick={() => setActiveTab('dashboard')}
             className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'dashboard'
-                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
-                : 'text-muted hover:text-foreground hover:bg-card/50'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <TrendingUp className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Dashboard</span>
+            <TrendingUp className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Dashboard</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('portfolio')}
             className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'portfolio'
-                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
-                : 'text-muted hover:text-foreground hover:bg-card/50'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <Briefcase className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Portfolio</span>
+            <Briefcase className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Portfolio</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('research')}
             className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'research'
-                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
-                : 'text-muted hover:text-foreground hover:bg-card/50'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <Search className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Conviction Detector</span>
+            <Search className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Conviction Detector</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('miner')}
             className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'miner'
-                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
-                : 'text-muted hover:text-foreground hover:bg-card/50'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <FlaskConical className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Phase 2: Analysis</span>
+            <FlaskConical className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 2: Analysis</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('signals')}
             className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'signals'
-                ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
-                : 'text-muted hover:text-foreground hover:bg-card/50'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <Radio className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Phase 3: Monitoring</span>
+            <Radio className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 3: Monitoring</span>
           </button>
         </nav>
 
