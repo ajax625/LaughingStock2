@@ -481,8 +481,13 @@ export default function Home() {
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Sliders className="w-6 h-6 text-amber-400" /> Post-Open Conviction Day Detector Studio
                 </h2>
-                <p className="text-xs text-muted mt-1">
-                  Adjust parameters in real-time to recalculate VolumeMA(x), RVOL, MedianPriceMA(y), Range%, & GapMA(z) across 365 daily bars.
+                <p className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
+                  <span>Adjust parameters in real-time to recalculate VolumeMA(x), RVOL, MedianPriceMA(y), Range%, & GapMA(z) across 365 daily bars.</span>
+                  {researchData?.dbSavedCount !== undefined && (
+                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-mono font-bold flex items-center gap-1">
+                      🗄️ {researchData.dbSavedCount} Daily Bars in DB
+                    </span>
+                  )}
                 </p>
               </div>
 

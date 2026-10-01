@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStockQuote, getStockCandles, calculateIndicators } from '@/lib/market-data';
 import { processConvictionDetector } from '@/lib/conviction-detector';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   req: Request,
@@ -26,6 +27,16 @@ export async function GET(
     // First Pass Harvest: 365 Days of 1D Daily Bars (Saved directly into PostgreSQL MarketCandle table)
     const rawCandles = await getStockCandles(symbol, 365, '1d');
 
+    // Query exact database count for this symbol
+    let dbCount = 0;
+    try {
+      dbCount = await prisma.marketCandle.count({
+        where: { symbol },
+      });
+    } catch (countErr) {
+      console.error(`Error querying MarketCandle count for ${symbol}:`, countErr);
+    }
+
     // Process Conviction Detector Engine
     const convictionResult = processConvictionDetector(symbol, rawCandles, {
       x,
@@ -45,6 +56,7 @@ export async function GET(
       params: convictionResult.params,
       harvestDays: 365,
       totalDailyCandles: rawCandles.length,
+      dbSavedCount: dbCount,
       indicators,
     });
   } catch (err: any) {
