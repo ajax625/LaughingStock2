@@ -177,7 +177,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6 w-full max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-[5%]">
+    <div className="min-h-screen p-4 md:p-6 w-full max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-6">
       {/* Sidebar Navigation Tabs (15% Width) */}
       <aside className="w-full lg:w-[15%] min-w-[220px] flex flex-col gap-5 shrink-0">
         {/* Brand Header */}
@@ -881,6 +881,9 @@ export default function Home() {
         </section>
       )}
       </main>
+
+      {/* Right Buffer (5% Width) */}
+      <div className="hidden lg:block lg:w-[5%] shrink-0 pointer-events-none" />
 
       {/* Trade Execution Modal */}
       {tradeModalOpen && (
