@@ -696,13 +696,13 @@ export default function Home() {
             <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} />
           </div>
 
-          {/* Intraday 15-Minute Bar Inspector (Triggered by Range Selection on Chart) */}
+          {/* Intraday Bar Inspector (Triggered by Range Selection on Chart) */}
           {selectedRange && (
             <div className="bg-card border border-cyan-500/40 rounded-xl p-5 shadow-lg space-y-4">
               <div className="flex justify-between items-center flex-wrap gap-2 border-b border-border pb-3">
                 <div>
                   <h3 className="font-bold text-md text-cyan-400 flex items-center gap-2">
-                    🎯 15-Minute Intraday Bar Inspector
+                    🎯 Intraday Bar Inspector ({intraday15mResult?.interval || '15m'} Bars)
                   </h3>
                   <p className="text-xs text-muted mt-0.5">
                     Pre-move window selected on chart: <strong className="text-foreground">{selectedRange.startDate}</strong> to <strong className="text-foreground">{selectedRange.endDate}</strong> ({selectedRange.candleCount} daily sessions)
@@ -710,7 +710,7 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-3 py-1 rounded-lg font-mono font-bold">
-                    {intraday15mResult?.total15mBars || 0} Intraday 15m Bars
+                    {intraday15mResult?.totalBars || intraday15mResult?.total15mBars || 0} Bars ({intraday15mResult?.interval || '15m'})
                   </span>
                   <button
                     onClick={() => handleRangeSelect(null)}
@@ -720,6 +720,12 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+
+              {intraday15mResult?.providerNotice && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 font-semibold flex items-center gap-2">
+                  <span>⚠️ {intraday15mResult.providerNotice}</span>
+                </div>
+              )}
 
               {loadingIntraday15m ? (
                 <div className="p-8 text-center text-muted text-sm italic">
