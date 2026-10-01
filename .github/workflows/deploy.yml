@@ -51,6 +51,11 @@ jobs:
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET || 'laughingstock_super_secret_jwt_key_2026' }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
             JEV_API_ENDPOINT=${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
+            MARKET_DATA_PROVIDER=${{ secrets.MARKET_DATA_PROVIDER || 'alpaca' }}
+            ALPACA_PAPER=${{ secrets.ALPACA_PAPER || 'true' }}
+            ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }}
+            ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }}
+            ALPACA_BASE_URL=${{ secrets.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2' }}
         run: |
           VPS_USER="${VPS_USER_SECRET:-root}"
           VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
