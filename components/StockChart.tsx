@@ -5,12 +5,24 @@ import { EnrichedCandle } from '@/lib/conviction-detector';
 
 interface StockChartProps {
   candles: any[];
+  onRangeSelect?: (range: { startDate: string; endDate: string; candleCount: number } | null) => void;
 }
 
-export default function StockChart({ candles }: StockChartProps) {
+export default function StockChart({ candles, onRangeSelect }: StockChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverCandle, setHoverCandle] = useState<any | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Drag-to-Select Date Range State
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartIdx, setDragStartIdx] = useState<number | null>(null);
+  const [dragCurrentIdx, setDragCurrentIdx] = useState<number | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{
+    startIdx: number;
+    endIdx: number;
+    startDate: string;
+    endDate: string;
+  } | null>(null);
 
   // Sliding X-Axis Timeline Controls
   const [visibleCount, setVisibleCount] = useState(60); // Default 60 bars visible
@@ -20,6 +32,8 @@ export default function StockChart({ candles }: StockChartProps) {
   useEffect(() => {
     if (candles && candles.length > 0) {
       setStartIndex(Math.max(0, candles.length - visibleCount));
+      setSelectedRange(null);
+      if (onRangeSelect) onRangeSelect(null);
     }
   }, [candles, visibleCount]);
 
@@ -64,10 +78,6 @@ export default function StockChart({ candles }: StockChartProps) {
       return paddingTop + priceChartH - ((val - minP) / priceRange) * priceChartH;
     }
 
-    function getPriceAtY(y: number) {
-      return maxP - ((y - paddingTop) / priceChartH) * priceRange;
-    }
-
     // Min & Max Volume Bounds
     const maxVol = Math.max(...visibleCandles.map((c) => Math.max(c.volume || 0, c.volumeMA || 0))) * 1.05 || 1;
 
@@ -98,145 +108,190 @@ export default function StockChart({ candles }: StockChartProps) {
     }
 
     // 2. Draw X-Axis Date Scale Labels
-    const stepX = Math.max(1, Math.floor(visibleCandles.length / 6));
-    ctx.textAlign = 'center';
-
-    visibleCandles.forEach((c, i) => {
-      if (i % stepX === 0 || i === visibleCandles.length - 1) {
-        const xPos = paddingLeft + i * (chartW / visibleCandles.length) + barWidth / 2;
-
-        ctx.strokeStyle = '#1e293b';
-        ctx.beginPath();
-        ctx.moveTo(xPos, paddingTop);
-        ctx.lineTo(xPos, paddingTop + priceChartH);
-        ctx.stroke();
-
-        const dateFormatted = c.date ? c.date.slice(5) : '';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(dateFormatted, xPos, h - 8);
+    const labelStep = Math.max(1, Math.floor(visibleCandles.length / 6));
+    visibleCandles.forEach((c, idx) => {
+      if (idx % labelStep === 0 || idx === visibleCandles.length - 1) {
+        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+        ctx.fillStyle = '#64748b';
+        ctx.textAlign = 'center';
+        ctx.fillText(c.date.slice(5), xPos, h - 8);
       }
     });
 
-    // Sub-Panel Separator Line
-    ctx.strokeStyle = '#334155';
+    // 3. Draw Volume Sub-Panel Grid & Bars
+    ctx.strokeStyle = '#1e293b';
     ctx.beginPath();
-    ctx.moveTo(paddingLeft, volumeTopY - 10);
-    ctx.lineTo(paddingLeft + chartW, volumeTopY - 10);
+    ctx.moveTo(paddingLeft, volumeTopY);
+    ctx.lineTo(paddingLeft + chartW, volumeTopY);
     ctx.stroke();
 
-    // Volume Sub-Panel Y-Axis Label
-    ctx.fillStyle = '#f59e0b';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${(maxVol / 1e6).toFixed(1)}M`, paddingLeft + chartW + 8, volumeTopY + 10);
+    visibleCandles.forEach((c, idx) => {
+      const xPos = paddingLeft + idx * (chartW / visibleCandles.length);
+      const isBull = c.close >= c.open;
+      const volY = getVolY(c.volume || 0);
 
-    // 3. Draw Candlesticks & Volume Bars
-    visibleCandles.forEach((c, i) => {
-      const x = paddingLeft + i * (chartW / visibleCandles.length) + barWidth / 2;
-      const isGreen = c.close >= c.open;
-      const isConviction = c.isConvictionDay || c.highlight;
+      ctx.fillStyle = isBull ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+      ctx.fillRect(xPos + 1, volY, Math.max(1, barWidth - 1), volumeTopY + volumeChartH - volY);
+    });
 
-      const color = isConviction
-        ? '#f59e0b'
-        : isGreen
-        ? '#10b981'
-        : '#f43f5e';
+    // 4. Draw Volume MA (Amber Line)
+    ctx.beginPath();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.5;
+    let volMaStarted = false;
+    visibleCandles.forEach((c, idx) => {
+      if (c.volumeMA !== undefined) {
+        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+        const yPos = getVolY(c.volumeMA);
+        if (!volMaStarted) {
+          ctx.moveTo(xPos, yPos);
+          volMaStarted = true;
+        } else {
+          ctx.lineTo(xPos, yPos);
+        }
+      }
+    });
+    ctx.stroke();
 
-      // Price High-Low Wick
+    // 5. Draw Price Candlesticks
+    visibleCandles.forEach((c, idx) => {
+      const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+      const isBull = c.close >= c.open;
+      const color = isBull ? '#22c55e' : '#ef4444';
+
+      const openY = getPriceY(c.open);
+      const closeY = getPriceY(c.close);
+      const highY = getPriceY(c.high);
+      const lowY = getPriceY(c.low);
+
+      // High-Low Wick Line
       ctx.strokeStyle = color;
-      ctx.lineWidth = isConviction ? 2 : 1;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x, getPriceY(c.high));
-      ctx.lineTo(x, getPriceY(c.low));
+      ctx.moveTo(xPos, highY);
+      ctx.lineTo(xPos, lowY);
       ctx.stroke();
 
-      // Price Candle Body
+      // Open-Close Body Rect
       ctx.fillStyle = color;
-      const topY = getPriceY(Math.max(c.open, c.close));
-      const botY = getPriceY(Math.min(c.open, c.close));
-      const bodyH = Math.max(2, botY - topY);
-      ctx.fillRect(x - barWidth / 2 + 1, topY, Math.max(1, barWidth - 2), bodyH);
+      const rectTop = Math.min(openY, closeY);
+      const rectH = Math.max(2, Math.abs(openY - closeY));
+      ctx.fillRect(xPos - barWidth / 2 + 0.5, rectTop, Math.max(1, barWidth - 1), rectH);
 
-      // Volume Bar
-      ctx.fillStyle = isGreen ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)';
-      const vY = getVolY(c.volume || 0);
-      const vH = Math.max(1, volumeTopY + volumeChartH - vY);
-      ctx.fillRect(x - barWidth / 2 + 1, vY, Math.max(1, barWidth - 2), vH);
-
-      // Conviction Day Visual Star Badge
-      if (isConviction) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.beginPath();
-        ctx.arc(x, getPriceY(c.high) - 10, 5, 0, Math.PI * 2);
-        ctx.fill();
+      // 6. Draw Gold Star (★ Badge) for Conviction Days
+      if (c.isConvictionDay) {
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#eab308';
+        ctx.textAlign = 'center';
+        ctx.fillText('★', xPos, highY - 8);
       }
     });
 
-    // 4. Draw Line Graph: MedianPriceMA(y) Line Overlay (Cyan)
+    // 7. Draw Median Price MA Overlay Line (Cyan)
+    ctx.beginPath();
     ctx.strokeStyle = '#06b6d4';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    let startedMedian = false;
-
-    visibleCandles.forEach((c, i) => {
+    let maStarted = false;
+    visibleCandles.forEach((c, idx) => {
       if (c.medianPriceMA !== undefined) {
-        const x = paddingLeft + i * (chartW / visibleCandles.length) + barWidth / 2;
-        const y = getPriceY(c.medianPriceMA);
-        if (!startedMedian) {
-          ctx.moveTo(x, y);
-          startedMedian = true;
+        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+        const yPos = getPriceY(c.medianPriceMA);
+        if (!maStarted) {
+          ctx.moveTo(xPos, yPos);
+          maStarted = true;
         } else {
-          ctx.lineTo(x, y);
+          ctx.lineTo(xPos, yPos);
         }
       }
     });
     ctx.stroke();
 
-    // 5. Draw Line Graph: VolumeMA(x) Line Overlay (Yellow/Amber)
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    let startedVolMA = false;
+    // 8. Render Drag Selection Range Overlay (Active Drag or Selected Range)
+    let highlightStartIdx: number | null = null;
+    let highlightEndIdx: number | null = null;
 
-    visibleCandles.forEach((c, i) => {
-      if (c.volumeMA !== undefined) {
-        const x = paddingLeft + i * (chartW / visibleCandles.length) + barWidth / 2;
-        const y = getVolY(c.volumeMA);
-        if (!startedVolMA) {
-          ctx.moveTo(x, y);
-          startedVolMA = true;
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-    });
-    ctx.stroke();
+    if (isDragging && dragStartIdx !== null && dragCurrentIdx !== null) {
+      highlightStartIdx = Math.min(dragStartIdx, dragCurrentIdx);
+      highlightEndIdx = Math.max(dragStartIdx, dragCurrentIdx);
+    } else if (selectedRange) {
+      highlightStartIdx = selectedRange.startIdx;
+      highlightEndIdx = selectedRange.endIdx;
+    }
 
-    // 6. Draw Mouse Crosshairs if hovering
+    if (highlightStartIdx !== null && highlightEndIdx !== null) {
+      const startX = paddingLeft + highlightStartIdx * (chartW / visibleCandles.length);
+      const endX = paddingLeft + (highlightEndIdx + 1) * (chartW / visibleCandles.length);
+      const selWidth = endX - startX;
+
+      // Cyan Highlight Box
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.18)';
+      ctx.fillRect(startX, paddingTop, selWidth, totalH);
+
+      // Cyan Border Lines
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1.5;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, paddingTop);
+      ctx.lineTo(startX, paddingTop + totalH);
+      ctx.moveTo(endX, paddingTop);
+      ctx.lineTo(endX, paddingTop + totalH);
+      ctx.stroke();
+
+      // Top Range Label Badge
+      ctx.fillStyle = '#06b6d4';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      const startDateStr = visibleCandles[highlightStartIdx]?.date || '';
+      const endDateStr = visibleCandles[highlightEndIdx]?.date || '';
+      ctx.fillText(`🎯 Selected Range: ${startDateStr} to ${endDateStr}`, startX + selWidth / 2, paddingTop - 8);
+    }
+
+    // 9. Draw Crosshair & Hover Inspector Line
     if (mousePos && mousePos.x >= paddingLeft && mousePos.x <= paddingLeft + chartW) {
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+      ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
+
+      // Vertical Crosshair Line
       ctx.beginPath();
       ctx.moveTo(mousePos.x, paddingTop);
       ctx.lineTo(mousePos.x, h - paddingBottom);
       ctx.stroke();
 
+      // Horizontal Price Line
       if (mousePos.y >= paddingTop && mousePos.y <= paddingTop + priceChartH) {
         ctx.beginPath();
         ctx.moveTo(paddingLeft, mousePos.y);
         ctx.lineTo(paddingLeft + chartW, mousePos.y);
         ctx.stroke();
-
-        const hoveredPrice = getPriceAtY(mousePos.y);
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(paddingLeft + chartW, mousePos.y - 10, 60, 20);
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'left';
-        ctx.fillText(`$${hoveredPrice.toFixed(2)}`, paddingLeft + chartW + 4, mousePos.y + 4);
       }
 
       ctx.setLineDash([]);
     }
-  }, [visibleCandles, mousePos]);
+  }, [visibleCandles, hoverCandle, mousePos, isDragging, dragStartIdx, dragCurrentIdx, selectedRange]);
+
+  const getIndexFromX = (x: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visibleCandles || visibleCandles.length === 0) return 0;
+    const paddingLeft = 10;
+    const paddingRight = 65;
+    const chartW = canvas.width - paddingLeft - paddingRight;
+    const rawIdx = Math.floor(((x - paddingLeft) / chartW) * visibleCandles.length);
+    return Math.max(0, Math.min(visibleCandles.length - 1, rawIdx));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visibleCandles || visibleCandles.length === 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    const idx = getIndexFromX(x);
+    setIsDragging(true);
+    setDragStartIdx(idx);
+    setDragCurrentIdx(idx);
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -248,22 +303,52 @@ export default function StockChart({ candles }: StockChartProps) {
 
     setMousePos({ x, y });
 
-    const paddingLeft = 10;
-    const paddingRight = 65;
-    const chartW = canvas.width - paddingLeft - paddingRight;
+    const idx = getIndexFromX(x);
+    setHoverCandle(visibleCandles[idx]);
 
-    if (x >= paddingLeft && x <= paddingLeft + chartW) {
-      const idx = Math.floor(((x - paddingLeft) / chartW) * visibleCandles.length);
-      const clampedIdx = Math.max(0, Math.min(visibleCandles.length - 1, idx));
-      setHoverCandle(visibleCandles[clampedIdx]);
-    } else {
-      setHoverCandle(null);
+    if (isDragging) {
+      setDragCurrentIdx(idx);
     }
+  };
+
+  const handleMouseUp = () => {
+    if (isDragging && dragStartIdx !== null && dragCurrentIdx !== null) {
+      const minIdx = Math.min(dragStartIdx, dragCurrentIdx);
+      const maxIdx = Math.max(dragStartIdx, dragCurrentIdx);
+
+      const rangeObj = {
+        startIdx: minIdx,
+        endIdx: maxIdx,
+        startDate: visibleCandles[minIdx].date,
+        endDate: visibleCandles[maxIdx].date,
+      };
+
+      setSelectedRange(rangeObj);
+
+      if (onRangeSelect) {
+        onRangeSelect({
+          startDate: rangeObj.startDate,
+          endDate: rangeObj.endDate,
+          candleCount: maxIdx - minIdx + 1,
+        });
+      }
+    }
+    setIsDragging(false);
   };
 
   const handleMouseLeave = () => {
     setMousePos(null);
     setHoverCandle(null);
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedRange(null);
+    setDragStartIdx(null);
+    setDragCurrentIdx(null);
+    if (onRangeSelect) onRangeSelect(null);
   };
 
   const totalCandlesCount = candles ? candles.length : 0;
@@ -272,16 +357,18 @@ export default function StockChart({ candles }: StockChartProps) {
   return (
     <div className="space-y-3">
       {/* Interactive Canvas Container (Fixed Top Position) */}
-      <div className="relative w-full h-[420px] bg-[#0d1117] rounded-lg border border-border overflow-hidden p-2">
+      <div className="relative w-full h-[420px] bg-[#0d1117] rounded-lg border border-border overflow-hidden p-2 select-none">
         <canvas
           ref={canvasRef}
+          onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
           className="w-full h-full cursor-crosshair"
         />
       </div>
 
-      {/* Session Inspector Panel (Moved BELOW the Chart for Zero Page Jumps) */}
+      {/* Session Inspector Panel */}
       <div className="flex flex-wrap items-center justify-between text-xs bg-background p-3 rounded-lg border border-border min-h-[48px]">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="text-muted font-bold uppercase tracking-wider">Session Inspector:</span>
@@ -303,12 +390,20 @@ export default function StockChart({ candles }: StockChartProps) {
               )}
             </div>
           ) : (
-            <span className="text-muted italic">Hover over candles on the chart above to inspect session metrics</span>
+            <span className="text-muted italic">Click & drag on the chart above to select a period of interest (range)</span>
           )}
         </div>
 
         {/* Legend Indicators */}
         <div className="text-muted text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0">
+          {selectedRange && (
+            <button
+              onClick={clearSelection}
+              className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-2 py-0.5 rounded font-bold hover:bg-cyan-500/20 mr-2"
+            >
+              ✕ Clear Selected Range ({selectedRange.startDate} - {selectedRange.endDate})
+            </button>
+          )}
           <span className="flex items-center gap-1 text-cyan-400">
             <span className="w-3 h-0.5 bg-cyan-400"></span> MedianPriceMA
           </span>

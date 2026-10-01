@@ -40,6 +40,35 @@ export default function Home() {
   const [paramZ, setParamZ] = useState(20);
   const [researchData, setResearchData] = useState<any>(null);
 
+  // 15m Intraday Range Selection State
+  const [selectedRange, setSelectedRange] = useState<{ startDate: string; endDate: string; candleCount: number } | null>(null);
+  const [intraday15mResult, setIntraday15mResult] = useState<any>(null);
+  const [loadingIntraday15m, setLoadingIntraday15m] = useState(false);
+
+  const fetchIntraday15m = useCallback(async (symbol: string, startDate: string, endDate: string) => {
+    setLoadingIntraday15m(true);
+    try {
+      const res = await fetch(`/api/research/${symbol}/intraday?startDate=${startDate}&endDate=${endDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        setIntraday15mResult(data);
+      }
+    } catch (err) {
+      console.error('Failed to load 15m intraday data:', err);
+    } finally {
+      setLoadingIntraday15m(false);
+    }
+  }, []);
+
+  const handleRangeSelect = (range: { startDate: string; endDate: string; candleCount: number } | null) => {
+    setSelectedRange(range);
+    if (range) {
+      fetchIntraday15m(researchSymbol, range.startDate, range.endDate);
+    } else {
+      setIntraday15mResult(null);
+    }
+  };
+
   // Pattern Miner State
   const [minerSymbol, setMinerSymbol] = useState('NVDA');
   const [minerPct, setMinerPct] = useState(5.0);
@@ -609,8 +638,94 @@ export default function Home() {
               </div>
             </div>
 
-            <StockChart candles={researchData?.candles || []} />
+            <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} />
           </div>
+
+          {/* Intraday 15-Minute Bar Inspector (Triggered by Range Selection on Chart) */}
+          {selectedRange && (
+            <div className="bg-card border border-cyan-500/40 rounded-xl p-5 shadow-lg space-y-4">
+              <div className="flex justify-between items-center flex-wrap gap-2 border-b border-border pb-3">
+                <div>
+                  <h3 className="font-bold text-md text-cyan-400 flex items-center gap-2">
+                    🎯 15-Minute Intraday Bar Inspector
+                  </h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Pre-move window selected on chart: <strong className="text-foreground">{selectedRange.startDate}</strong> to <strong className="text-foreground">{selectedRange.endDate}</strong> ({selectedRange.candleCount} daily sessions)
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-3 py-1 rounded-lg font-mono font-bold">
+                    {intraday15mResult?.total15mBars || 0} Intraday 15m Bars
+                  </span>
+                  <button
+                    onClick={() => handleRangeSelect(null)}
+                    className="text-xs bg-card border border-border text-muted hover:text-foreground px-3 py-1 rounded-lg font-semibold"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+
+              {loadingIntraday15m ? (
+                <div className="p-8 text-center text-muted text-sm italic">
+                  Fetching 15m intraday bars for selected range...
+                </div>
+              ) : intraday15mResult && intraday15mResult.candles && intraday15mResult.candles.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto max-h-[320px] overflow-y-auto border border-border rounded-lg">
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-[11px] text-muted border-b border-border uppercase bg-background sticky top-0">
+                        <tr>
+                          <th className="py-2.5 px-3">15m Timestamp</th>
+                          <th className="py-2.5 px-3">Open</th>
+                          <th className="py-2.5 px-3">High</th>
+                          <th className="py-2.5 px-3">Low</th>
+                          <th className="py-2.5 px-3">Close</th>
+                          <th className="py-2.5 px-3">Volume</th>
+                          <th className="py-2.5 px-3">15m VolMA</th>
+                          <th className="py-2.5 px-3">15m RVOL</th>
+                          <th className="py-2.5 px-3">15m Range %</th>
+                          <th className="py-2.5 px-3 text-right">Intraday Signal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border font-mono">
+                        {intraday15mResult.candles.map((bar: any, idx: number) => (
+                          <tr key={idx} className={bar.isVolumeSpike ? 'bg-amber-500/10 font-bold' : 'hover:bg-background/40'}>
+                            <td className="py-2 px-3 font-semibold text-cyan-400">{bar.date}</td>
+                            <td className="py-2 px-3">${bar.open.toFixed(2)}</td>
+                            <td className="py-2 px-3 text-emerald-400">${bar.high.toFixed(2)}</td>
+                            <td className="py-2 px-3 text-rose-400">${bar.low.toFixed(2)}</td>
+                            <td className="py-2 px-3 font-bold">${bar.close.toFixed(2)}</td>
+                            <td className="py-2 px-3">{bar.volume.toLocaleString()}</td>
+                            <td className="py-2 px-3 text-amber-400">{bar.volumeMA?.toLocaleString()}</td>
+                            <td className="py-2 px-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bar.rvol > 1.5 ? 'bg-amber-500 text-black' : 'bg-background text-muted border border-border'}`}>
+                                {bar.rvol}x
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-purple-400 font-bold">{bar.rangePct}%</td>
+                            <td className="py-2 px-3 text-right font-sans">
+                              {bar.isVolumeSpike ? (
+                                <span className="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded font-bold">
+                                  🔥 Vol Spike
+                                </span>
+                              ) : (
+                                <span className="text-muted text-[10px]">Normal</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-muted text-xs italic">
+                  No 15m intraday data available for the selected date range.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Flagged Conviction Candidates Table */}
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
