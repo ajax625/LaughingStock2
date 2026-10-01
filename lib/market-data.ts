@@ -116,40 +116,23 @@ export async function getStockCandles(
       throw new Error(`No valid price candles found for symbol: ${sym}`);
     }
 
-    // 2. Persist Harvested Candles into PostgreSQL 'MarketCandle' Table
+    // 2. Efficient Batch Persistence into PostgreSQL 'MarketCandle' Table (Single SQL Query)
     try {
-      await Promise.all(
-        validCandles.map((c) =>
-          prisma.marketCandle.upsert({
-            where: {
-              symbol_interval_timestamp: {
-                symbol: sym,
-                interval: interval,
-                timestamp: new Date(c.date),
-              },
-            },
-            update: {
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: BigInt(c.volume),
-            },
-            create: {
-              symbol: sym,
-              interval: interval,
-              timestamp: new Date(c.date),
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: BigInt(c.volume),
-            },
-          })
-        )
-      );
+      await prisma.marketCandle.createMany({
+        data: validCandles.map((c) => ({
+          symbol: sym,
+          interval: interval,
+          timestamp: new Date(c.date),
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: BigInt(c.volume),
+        })),
+        skipDuplicates: true,
+      }));
     } catch (dbErr) {
-      console.warn(`PostgreSQL MarketCandle persist notice for ${sym}:`, dbErr);
+      console.error(`PostgreSQL MarketCandle bulk insert error for ${sym}:`, dbErr);
     }
 
     return validCandles;
