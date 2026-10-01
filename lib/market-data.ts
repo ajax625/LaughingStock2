@@ -75,7 +75,9 @@ export async function getStockQuote(symbol: string): Promise<Quote> {
 export async function getStockCandles(
   symbol: string,
   days = 60,
-  interval: CandleInterval = '1d'
+  interval: CandleInterval = '1d',
+  customStartDate?: string,
+  customEndDate?: string
 ): Promise<Candle[]> {
   const sym = symbol.toUpperCase().trim();
   if (!sym) throw new Error('Symbol is required');
@@ -84,9 +86,9 @@ export async function getStockCandles(
   let validCandles: Candle[] = [];
 
   if (provider === 'alpaca') {
-    validCandles = await getAlpacaCandles(sym, days, interval);
+    validCandles = await getAlpacaCandles(sym, days, interval, customStartDate, customEndDate);
   } else {
-    validCandles = await getYahooCandles(sym, days, interval);
+    validCandles = await getYahooCandles(sym, days, interval, customStartDate, customEndDate);
   }
 
   // Efficient Batch Persistence into PostgreSQL 'MarketCandle' Table (Single SQL Query)
@@ -143,10 +145,18 @@ async function getYahooQuote(sym: string): Promise<Quote> {
   }
 }
 
-async function getYahooCandles(sym: string, days: number, interval: CandleInterval): Promise<Candle[]> {
+async function getYahooCandles(
+  sym: string,
+  days: number,
+  interval: CandleInterval,
+  customStartDate?: string,
+  customEndDate?: string
+): Promise<Candle[]> {
   try {
-    const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const period2 = new Date();
+    const period1 = customStartDate
+      ? new Date(customStartDate)
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const period2 = customEndDate ? new Date(customEndDate) : new Date();
 
     const chartResult = await yahooFinance.chart(sym, {
       period1,
@@ -228,7 +238,13 @@ async function getAlpacaQuote(sym: string): Promise<Quote> {
   }
 }
 
-async function getAlpacaCandles(sym: string, days: number, interval: CandleInterval): Promise<Candle[]> {
+async function getAlpacaCandles(
+  sym: string,
+  days: number,
+  interval: CandleInterval,
+  customStartDate?: string,
+  customEndDate?: string
+): Promise<Candle[]> {
   const apiKey = process.env.ALPACA_API_KEY!;
   const secretKey = process.env.ALPACA_SECRET_KEY!;
 
@@ -241,8 +257,12 @@ async function getAlpacaCandles(sym: string, days: number, interval: CandleInter
   };
 
   const timeframe = timeframeMap[interval] || '1Day';
-  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const endDate = new Date().toISOString();
+  const startDate = customStartDate
+    ? new Date(customStartDate).toISOString()
+    : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const endDate = customEndDate
+    ? new Date(customEndDate).toISOString()
+    : new Date().toISOString();
 
   try {
     const url = `https://data.alpaca.markets/v2/stocks/${sym}/bars?timeframe=${timeframe}&start=${startDate}&end=${endDate}&limit=10000&feed=sip`;

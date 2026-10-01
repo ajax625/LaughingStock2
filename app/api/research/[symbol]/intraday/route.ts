@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStockCandles } from '@/lib/market-data';
+import { getStockCandles, getActiveMarketProvider } from '@/lib/market-data';
 
 export async function GET(
   req: Request,
@@ -18,12 +18,19 @@ export async function GET(
     let effectiveInterval: '15m' | '1h' | '1d' = '15m';
     let rawCandles: any[] = [];
     let providerNotice = '';
+    const activeProvider = getActiveMarketProvider();
 
-    // 1. Attempt 15-minute intraday bars (Yahoo Finance API 60-day max window)
+    const startISO = startDate ? `${startDate}T00:00:00Z` : undefined;
+    const endISO = endDate ? `${endDate}T23:59:59Z` : undefined;
+
+    // 1. Attempt 15-minute intraday bars
     try {
-      rawCandles = await getStockCandles(symbol, 60, '15m');
-    } catch (e15) {
-      console.warn(`15m candles unavailable for ${symbol}, trying 1h fallback...`);
+      const daysLookback = startDate
+        ? Math.max(60, Math.ceil((Date.now() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 5)
+        : 60;
+      rawCandles = await getStockCandles(symbol, daysLookback, '15m', startISO, endISO);
+    } catch (e15: any) {
+      console.warn(`15m candles unavailable for ${symbol}, trying 1h fallback...`, e15?.message || e15);
     }
 
     // Filter 15m candles if found
@@ -38,16 +45,18 @@ export async function GET(
     if (filtered.length === 0) {
       effectiveInterval = '1h';
       try {
-        const candles1h = await getStockCandles(symbol, 730, '1h');
+        const candles1h = await getStockCandles(symbol, 730, '1h', startISO, endISO);
         filtered = startDate && endDate
           ? candles1h.filter((c) => {
               const cDate = c.date.split(' ')[0];
               return cDate >= startDate && cDate <= endDate;
             })
           : candles1h;
-        providerNotice = 'Dates older than 60 days: Yahoo Finance limits 15m intraday bars to the last 60 days. Displaying 1-Hour (1h) intraday bars.';
-      } catch (e1h) {
-        console.warn(`1h candles unavailable for ${symbol}, trying 1d fallback...`);
+        if (activeProvider === 'yahoo') {
+          providerNotice = 'Dates older than 60 days: Yahoo Finance limits 15m intraday bars to the last 60 days. Displaying 1-Hour (1h) intraday bars.';
+        }
+      } catch (e1h: any) {
+        console.warn(`1h candles unavailable for ${symbol}, trying 1d fallback...`, e1h?.message || e1h);
       }
     }
 
@@ -58,7 +67,9 @@ export async function GET(
       filtered = startDate && endDate
         ? candles1d.filter((c) => c.date >= startDate && c.date <= endDate)
         : candles1d;
-      providerNotice = 'Historical range older than 2 years: Intraday 15m/1h APIs expired. Displaying daily session bars.';
+      providerNotice = activeProvider === 'alpaca'
+        ? `No historical bars returned from Alpaca for ${symbol} between ${startDate} and ${endDate}.`
+        : 'Historical range older than 2 years: Intraday 15m/1h APIs expired. Displaying daily session bars.';
     }
 
     // Compute Intraday Indicators (Volume MA & RVOL)
