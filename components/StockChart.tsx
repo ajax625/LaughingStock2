@@ -383,6 +383,9 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
               {hoverCandle.rvol !== undefined && (
                 <span className="text-amber-400 font-bold">RVOL: {hoverCandle.rvol}x</span>
               )}
+              {hoverCandle.rangePct !== undefined && (
+                <span className="text-purple-400 font-bold">Range%: {hoverCandle.rangePct}%</span>
+              )}
               {hoverCandle.isConvictionDay && (
                 <span className="bg-amber-500 text-black px-2 py-0.5 rounded font-bold">
                   ★ CONVICTION DAY
