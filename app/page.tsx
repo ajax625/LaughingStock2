@@ -193,56 +193,61 @@ export default function Home() {
         </div>
 
         {/* Vertical Navigation Tabs */}
-        <nav className="bg-card border border-border rounded-xl p-2 shadow-sm flex flex-col gap-1.5 text-sm font-medium">
+        <nav className="bg-card border border-border rounded-xl p-2 shadow-sm flex flex-col gap-1.5 text-sm font-medium relative z-10">
           <button
+            type="button"
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'dashboard'
                 ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
                 : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <TrendingUp className="w-4 h-4 shrink-0" /> <span>Dashboard</span>
+            <TrendingUp className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Dashboard</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('portfolio')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'portfolio'
                 ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
                 : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Briefcase className="w-4 h-4 shrink-0" /> <span>Portfolio</span>
+            <Briefcase className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Portfolio</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('research')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'research'
                 ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
                 : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Search className="w-4 h-4 shrink-0" /> <span>Conviction Detector</span>
+            <Search className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Conviction Detector</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('miner')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'miner'
                 ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
                 : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <FlaskConical className="w-4 h-4 shrink-0" /> <span>Phase 2: Analysis</span>
+            <FlaskConical className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Phase 2: Analysis</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('signals')}
-            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold ${
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
               activeTab === 'signals'
                 ? 'bg-blue-600/15 text-blue-500 font-bold border-l-4 border-blue-500 shadow-sm'
                 : 'text-muted hover:text-foreground hover:bg-card/50'
             }`}
           >
-            <Radio className="w-4 h-4 shrink-0" /> <span>Phase 3: Monitoring</span>
+            <Radio className="w-4 h-4 shrink-0 pointer-events-none" /> <span className="pointer-events-none">Phase 3: Monitoring</span>
           </button>
         </nav>
 
