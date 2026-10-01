@@ -950,7 +950,12 @@ export default function Home() {
               </table>
             </div>
           </div>
+        </section>
+      )}
 
+      {/* VIEW 4: PHASE 2 ANALYSIS & STRATEGY ENGINE */}
+      {activeTab === 'miner' && (
+        <section className="space-y-6">
           {/* Approved Research Datasets & Potential Candidates Panel */}
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
@@ -1008,7 +1013,11 @@ export default function Home() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => fetchIntraday15m(ds.symbol, ds.startDate, ds.endDate)}
+                              onClick={() => {
+                                setResearchSymbol(ds.symbol);
+                                setActiveTab('research');
+                                fetchIntraday15m(ds.symbol, ds.startDate, ds.endDate);
+                              }}
                               className="text-xs bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-2.5 py-1 rounded font-semibold hover:bg-cyan-600/30 cursor-pointer"
                             >
                               Inspect 15m Bars
@@ -1017,7 +1026,6 @@ export default function Home() {
                               type="button"
                               onClick={() => {
                                 setMinerSymbol(ds.symbol);
-                                setActiveTab('miner');
                                 runMiner(ds.symbol);
                               }}
                               className="text-xs bg-purple-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-purple-700 shadow cursor-pointer"
@@ -1046,16 +1054,11 @@ export default function Home() {
               </div>
             ) : (
               <div className="p-8 text-center text-muted text-xs italic">
-                No approved research datasets persisted yet. Select a 15m range on the chart and click "+ Attach Range" on a conviction candidate above to generate a dataset!
+                No approved research datasets persisted yet. Select a 15m range on the chart in Research Studio and click "+ Attach Range" on a conviction candidate to generate a dataset!
               </div>
             )}
           </div>
-        </section>
-      )}
 
-      {/* VIEW 4: PHASE 2 ANALYSIS */}
-      {activeTab === 'miner' && (
-        <section className="space-y-6">
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
             <div className="flex justify-between items-center">
               <div>
