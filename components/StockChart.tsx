@@ -352,6 +352,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
   };
 
   const totalCandlesCount = candles ? candles.length : 0;
+  const is365View = visibleCount >= totalCandlesCount || visibleCount === 365;
   const maxStartIndex = Math.max(0, totalCandlesCount - visibleCount);
 
   return (
@@ -371,7 +372,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
       {/* Session Inspector Panel */}
       <div className="flex flex-wrap items-center justify-between text-xs bg-background p-3 rounded-lg border border-border min-h-[48px]">
         <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-muted font-bold uppercase tracking-wider">Session Inspector:</span>
+          <span className="text-muted-foreground font-bold uppercase tracking-wider">Session Inspector:</span>
           {hoverCandle ? (
             <div className="flex items-center gap-3 font-semibold font-mono flex-wrap">
               <span className="text-foreground">Date: {hoverCandle.date}</span>
@@ -393,16 +394,16 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
               )}
             </div>
           ) : (
-            <span className="text-muted italic">Click & drag on the chart above to select a period of interest (range)</span>
+            <span className="text-muted-foreground italic">Click & drag on the chart above to select a period of interest (range)</span>
           )}
         </div>
 
         {/* Legend Indicators */}
-        <div className="text-muted text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0">
+        <div className="text-muted-foreground text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0">
           {selectedRange && (
             <button
               onClick={clearSelection}
-              className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-2 py-0.5 rounded font-bold hover:bg-cyan-500/20 mr-2"
+              className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-2 py-0.5 rounded font-bold hover:bg-cyan-500/20 mr-2 cursor-pointer"
             >
               ✕ Clear Selected Range ({selectedRange.startDate} - {selectedRange.endDate})
             </button>
@@ -419,39 +420,93 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
         </div>
       </div>
 
-      {/* Sliding X-Axis Zoom & Scroll Controls */}
-      <div className="bg-card border border-border rounded-lg p-3 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-muted font-bold">Zoom Window:</span>
-          {[30, 60, 90, 180, 365].map((cnt) => (
-            <button
-              key={cnt}
-              onClick={() => {
-                setVisibleCount(cnt);
-                setStartIndex(Math.max(0, totalCandlesCount - cnt));
-              }}
-              className={`px-2.5 py-1 rounded font-bold transition ${
-                visibleCount === cnt ? 'bg-blue-600 text-white' : 'bg-background text-muted border border-border hover:text-foreground'
-              }`}
-            >
-              {cnt}D
-            </button>
-          ))}
+      {/* 60% Width Sliding X-Axis Zoom & Scroll Controls with Conviction Bars Heatmap */}
+      <div className="bg-card border border-border rounded-xl p-4 flex flex-col lg:flex-row justify-between items-center gap-4 text-xs">
+        {/* Zoom Window Presets */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-muted-foreground font-bold">Zoom Window:</span>
+          {[30, 60, 90, 180, 365].map((cnt) => {
+            const isSelected = visibleCount === cnt || (cnt === 365 && visibleCount >= totalCandlesCount);
+            return (
+              <button
+                key={cnt}
+                type="button"
+                onClick={() => {
+                  setVisibleCount(cnt);
+                  setStartIndex(Math.max(0, totalCandlesCount - cnt));
+                }}
+                className={`px-3 py-1.5 rounded-lg font-extrabold text-xs transition cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_10px_rgba(0,255,135,0.2)]'
+                    : 'bg-background text-muted-foreground border border-border hover:text-foreground hover:bg-card/60'
+                }`}
+              >
+                {cnt}D
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-md">
-          <span className="text-muted font-semibold whitespace-nowrap">Slide Timeline:</span>
-          <input
-            type="range"
-            min="0"
-            max={maxStartIndex}
-            value={startIndex}
-            onChange={(e) => setStartIndex(Number(e.target.value))}
-            className="w-full accent-blue-500 cursor-pointer"
-          />
-          <span className="text-muted font-mono whitespace-nowrap">
-            {visibleCandles[0]?.date} to {visibleCandles[visibleCandles.length - 1]?.date}
-          </span>
+        {/* 60% Width Timeline Scrubber & Conviction Days Heatmap */}
+        <div className="w-full lg:w-[60%] flex flex-col gap-1.5 shrink-0">
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-muted-foreground font-semibold flex items-center gap-2">
+              <span>Slide 365D Timeline:</span>
+              {is365View ? (
+                <span className="text-amber-400 font-mono text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                  🔒 Slider Disabled in 365D View
+                </span>
+              ) : (
+                <span className="text-emerald-400 font-mono text-[10px]">
+                  (Bars {startIndex + 1} – {Math.min(totalCandlesCount, startIndex + visibleCount)} of {totalCandlesCount})
+                </span>
+              )}
+            </span>
+            <span className="text-emerald-400 font-mono font-bold">
+              {visibleCandles[0]?.date} → {visibleCandles[visibleCandles.length - 1]?.date}
+            </span>
+          </div>
+
+          {/* Timeline Track Container with Plotted Conviction Day Bars */}
+          <div className="relative w-full h-8 bg-slate-950 border border-border rounded-lg overflow-hidden flex items-center px-1">
+            {/* 1. Conviction Day Vertical Bars Heatmap Plot */}
+            <div className="absolute inset-0 w-full h-full pointer-events-none flex items-center">
+              {candles && candles.length > 0 && candles.map((c, idx) => {
+                if (!c.isConvictionDay) return null;
+                const leftPct = (idx / candles.length) * 100;
+                return (
+                  <div
+                    key={idx}
+                    className="absolute top-0 bottom-0 w-[3px] bg-amber-400 shadow-[0_0_6px_#f59e0b] z-10"
+                    style={{ left: `${leftPct}%` }}
+                    title={`★ Conviction Day: ${c.date} (RVOL: ${c.rvol}x, Range%: ${c.rangePct}%)`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* 2. Active Range Highlight Box on Timeline Track */}
+            {totalCandlesCount > 0 && !is365View && (
+              <div
+                className="absolute top-1 bottom-1 bg-emerald-500/20 border border-emerald-500/50 rounded pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(0,255,135,0.3)] z-15"
+                style={{
+                  left: `${(startIndex / totalCandlesCount) * 100}%`,
+                  width: `${(visibleCount / totalCandlesCount) * 100}%`,
+                }}
+              />
+            )}
+
+            {/* 3. Range Input Slider (Disabled in 365d view) */}
+            <input
+              type="range"
+              min="0"
+              max={maxStartIndex}
+              disabled={is365View}
+              value={is365View ? 0 : startIndex}
+              onChange={(e) => setStartIndex(Number(e.target.value))}
+              className="w-full h-full opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed accent-emerald-400 cursor-pointer relative z-20"
+            />
+          </div>
         </div>
       </div>
     </div>
