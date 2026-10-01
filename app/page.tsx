@@ -611,6 +611,14 @@ export default function Home() {
               </button>
             )}
           </div>
+          <div className="pt-2 border-t border-border/60 text-[10px] font-mono text-center space-y-0.5 select-none">
+            <div className="font-bold text-emerald-400 font-mono">
+              {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.0.de0bd2c'}
+            </div>
+            <div className="text-muted text-[9px] font-mono">
+              {process.env.NEXT_PUBLIC_BUILD_DATE || '10/01/2026 8:32am PST'}
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -1360,6 +1368,19 @@ export default function Home() {
           </div>
         </section>
       )}
+
+        {/* Global Application Footer with Version & Build Date */}
+        <footer className="w-full pt-4 pb-2 border-t border-border text-[11px] font-mono text-muted flex flex-col sm:flex-row items-center justify-between gap-2 mt-8">
+          <div className="flex items-center gap-2 font-bold text-foreground">
+            <span>LaughingStock JEV Engine</span>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-bold">
+              {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.0.de0bd2c'}
+            </span>
+          </div>
+          <div className="text-muted/80 font-mono text-[10px]">
+            Build: {process.env.NEXT_PUBLIC_BUILD_DATE || '10/01/2026 8:32am PST'}
+          </div>
+        </footer>
       </main>
 
       {/* Right Buffer (5% Width) */}
