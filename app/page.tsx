@@ -991,209 +991,6 @@ export default function Home() {
 
             <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} />
           </div>
-
-          {/* Intraday Bar Inspector (Triggered by Range Selection on Chart) */}
-          {selectedRange && (
-            <div className="bg-card border border-cyan-500/40 rounded-xl p-5 shadow-lg space-y-4">
-              <div className="flex justify-between items-center flex-wrap gap-2 border-b border-border pb-3">
-                <div>
-                  <h3 className="font-bold text-md text-cyan-400 flex items-center gap-2">
-                    🎯 Intraday Bar Inspector ({intraday15mResult?.interval || '15m'} Bars)
-                  </h3>
-                  <p className="text-xs text-muted mt-0.5">
-                    Pre-move window selected on chart: <strong className="text-foreground">{selectedRange.startDate}</strong> to <strong className="text-foreground">{selectedRange.endDate}</strong> ({selectedRange.candleCount} daily sessions)
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-3 py-1 rounded-lg font-mono font-bold">
-                    {intraday15mResult?.totalBars || intraday15mResult?.total15mBars || 0} Bars ({intraday15mResult?.interval || '15m'})
-                  </span>
-                  <button
-                    onClick={() => handleRangeSelect(null)}
-                    className="text-xs bg-card border border-border text-muted hover:text-foreground px-3 py-1 rounded-lg font-semibold"
-                  >
-                    Clear Selection
-                  </button>
-                </div>
-              </div>
-
-              {intraday15mResult?.providerNotice && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 font-semibold flex items-center gap-2">
-                  <span>⚠️ {intraday15mResult.providerNotice}</span>
-                </div>
-              )}
-
-              {loadingIntraday15m ? (
-                <div className="p-8 text-center text-muted text-sm italic">
-                  Fetching 15m intraday bars for selected range...
-                </div>
-              ) : intraday15mResult && intraday15mResult.candles && intraday15mResult.candles.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="overflow-x-auto max-h-[320px] overflow-y-auto border border-border rounded-lg">
-                    <table className="w-full text-left text-xs">
-                      <thead className="text-[11px] text-muted border-b border-border uppercase bg-background sticky top-0">
-                        <tr>
-                          <th className="py-2.5 px-3">15m Timestamp</th>
-                          <th className="py-2.5 px-3">Open</th>
-                          <th className="py-2.5 px-3">High</th>
-                          <th className="py-2.5 px-3">Low</th>
-                          <th className="py-2.5 px-3">Close</th>
-                          <th className="py-2.5 px-3">Volume</th>
-                          <th className="py-2.5 px-3">15m VolMA</th>
-                          <th className="py-2.5 px-3">15m RVOL</th>
-                          <th className="py-2.5 px-3">15m Range %</th>
-                          <th className="py-2.5 px-3 text-right">Intraday Signal</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border font-mono">
-                        {intraday15mResult.candles.map((bar: any, idx: number) => (
-                          <tr key={idx} className={bar.isVolumeSpike ? 'bg-amber-500/10 font-bold' : 'hover:bg-background/40'}>
-                            <td className="py-2 px-3 font-semibold text-cyan-400">{bar.date}</td>
-                            <td className="py-2 px-3">${bar.open.toFixed(2)}</td>
-                            <td className="py-2 px-3 text-emerald-400">${bar.high.toFixed(2)}</td>
-                            <td className="py-2 px-3 text-rose-400">${bar.low.toFixed(2)}</td>
-                            <td className="py-2 px-3 font-bold">${bar.close.toFixed(2)}</td>
-                            <td className="py-2 px-3">{bar.volume.toLocaleString()}</td>
-                            <td className="py-2 px-3 text-amber-400">{bar.volumeMA?.toLocaleString()}</td>
-                            <td className="py-2 px-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bar.rvol > 1.5 ? 'bg-amber-500 text-black' : 'bg-background text-muted border border-border'}`}>
-                                {bar.rvol}x
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-purple-400 font-bold">{bar.rangePct}%</td>
-                            <td className="py-2 px-3 text-right font-sans">
-                              {bar.isVolumeSpike ? (
-                                <span className="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded font-bold">
-                                  🔥 Vol Spike
-                                </span>
-                              ) : (
-                                <span className="text-muted text-[10px]">Normal</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-6 text-center text-muted text-xs italic">
-                  No 15m intraday data available for the selected date range.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Flagged Conviction Candidates Table */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
-              <div>
-                <h3 className="font-bold text-md text-foreground flex items-center gap-2">
-                  <Award className="w-5 h-5 text-amber-400" /> Flagged Conviction Candidate Sessions ({researchData?.convictionCount || 0})
-                </h3>
-                <p className="text-xs text-muted mt-0.5">
-                  Verify each conviction day by selecting its 15m research range on the chart above.
-                </p>
-              </div>
-
-              {/* Master "Add for Research" Action Button */}
-              <button
-                type="button"
-                disabled={Object.keys(verifiedRanges).length === 0 || isSubmittingResearch}
-                onClick={handleAddForResearch}
-                className={`text-xs px-4 py-2 rounded-lg font-extrabold flex items-center gap-1.5 transition ${
-                  Object.keys(verifiedRanges).length > 0
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-lg animate-pulse'
-                    : 'bg-muted/20 text-muted border border-border cursor-not-allowed opacity-60'
-                }`}
-              >
-                <Plus className="w-4 h-4" /> Add for Research ({Object.keys(verifiedRanges).length} Verified)
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-muted border-b border-border uppercase">
-                  <tr>
-                    <th className="pb-3">Conviction Date</th>
-                    <th className="pb-3">Open</th>
-                    <th className="pb-3">High / Low Range</th>
-                    <th className="pb-3">Close</th>
-                    <th className="pb-3">RVOL (x={paramX})</th>
-                    <th className="pb-3">Median (y={paramY})</th>
-                    <th className="pb-3">Range %</th>
-                    <th className="pb-3">Verified 15m Range</th>
-                    <th className="pb-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border font-medium">
-                  {researchData && researchData.candidates && researchData.candidates.length > 0 ? (
-                    researchData.candidates.map((cand: any) => (
-                      <tr key={cand.date} className="hover:bg-background/50 transition">
-                        <td className="py-3 font-bold text-amber-400">{cand.date}</td>
-                        <td>${cand.open.toFixed(2)}</td>
-                        <td className="text-xs text-muted">${cand.high.toFixed(2)} – ${cand.low.toFixed(2)}</td>
-                        <td className="font-bold">${cand.close.toFixed(2)}</td>
-                        <td>
-                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold text-xs">
-                            {cand.rvol}x
-                          </span>
-                        </td>
-                        <td className="text-xs">${cand.medianPriceMA.toFixed(2)}</td>
-                        <td className="text-purple-400 font-bold">{cand.rangePct}%</td>
-                        <td>
-                          {verifiedRanges[cand.date] ? (
-                            <div className="flex items-center gap-2">
-                              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono text-xs font-bold flex items-center gap-1">
-                                🟢 {verifiedRanges[cand.date].startDate} → {verifiedRanges[cand.date].endDate} (15m)
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => removeRangeFromCandidate(cand.date)}
-                                className="text-muted hover:text-rose-400 text-xs font-bold px-1"
-                                title="Remove attached range"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : selectedRange ? (
-                            <button
-                              type="button"
-                              onClick={() => attachRangeToCandidate(cand.date, cand)}
-                              className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-xs px-2.5 py-1 rounded font-bold hover:bg-cyan-500/30 transition"
-                            >
-                              + Attach Range ({selectedRange.startDate} - {selectedRange.endDate})
-                            </button>
-                          ) : (
-                            <span className="text-muted text-xs italic">⚪ Unverified (Drag range on chart)</span>
-                          )}
-                        </td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMinerSymbol(researchSymbol);
-                              setActiveTab('miner');
-                              runMiner(researchSymbol);
-                            }}
-                            className="text-xs bg-purple-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-purple-700 shadow"
-                          >
-                            Mine Fingerprint →
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="py-8 text-center text-muted italic">
-                        No conviction sessions found matching current parameters (RVOL &gt; {paramVmin}x, Range% &gt; {paramM}%). Try lowering thresholds.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </section>
       )}
 
@@ -1571,96 +1368,79 @@ export default function Home() {
         </div>
       )}
 
-      {/* Conviction Day Association Popup Modal */}
+      {/* Conviction Day Association Popup Modal (Compact & Translucent) */}
       {isAssociationModalOpen && selectedRange && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-emerald-500/50 rounded-2xl max-w-2xl w-full p-6 shadow-[0_0_40px_rgba(0,255,135,0.2)] space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-start border-b border-border pb-4">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+          <div className="bg-card/95 border border-emerald-500/60 rounded-xl max-w-sm w-full p-4 shadow-[0_0_30px_rgba(0,255,135,0.25)] space-y-3 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center border-b border-border pb-2.5">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                    <Sparkles className="w-5 h-5" />
-                  </span>
-                  <h3 className="font-extrabold text-lg text-foreground">
-                    Associate Range with Conviction Day
-                  </h3>
-                </div>
-                <p className="text-xs text-muted mt-1">
-                  Selected 15m Range: <strong className="text-emerald-400 font-mono">{selectedRange.startDate}</strong> to <strong className="text-emerald-400 font-mono">{selectedRange.endDate}</strong> ({selectedRange.candleCount} daily session{selectedRange.candleCount > 1 ? 's' : ''})
+                <h3 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" /> Conviction Days in Range
+                </h3>
+                <p className="text-[11px] text-emerald-400 font-mono font-semibold mt-0.5">
+                  {selectedRange.startDate} → {selectedRange.endDate}
                 </p>
               </div>
               <button
                 onClick={() => setIsAssociationModalOpen(false)}
-                className="text-muted hover:text-foreground font-bold p-1 rounded-lg border border-border hover:bg-background transition"
+                className="text-muted hover:text-foreground font-bold text-xs px-2 py-1 rounded border border-border hover:bg-background transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-xs text-muted font-medium">
-                Select a conviction candidate session to associate with this range. Instant persistence will generate dataset <code className="text-amber-400 font-mono font-bold">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code> in PostgreSQL & Phase 2 Analysis:
-              </p>
-
-              <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
-                {researchData?.candidates && researchData.candidates.length > 0 ? (
-                  researchData.candidates.map((cand: any) => {
-                    const isInsideRange = cand.date >= selectedRange.startDate && cand.date <= selectedRange.endDate;
-                    const isVerified = verifiedRanges[cand.date];
-                    return (
-                      <div
-                        key={cand.date}
-                        className={`p-3.5 rounded-xl border flex items-center justify-between transition ${
-                          isInsideRange
-                            ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_15px_rgba(0,255,135,0.1)]'
-                            : 'bg-background/60 border-border hover:border-emerald-500/30'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-extrabold text-amber-400 text-sm">{cand.date}</span>
-                            {isInsideRange && (
-                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
-                                🎯 Selected Range Match
-                              </span>
-                            )}
-                            {isVerified && (
-                              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-bold">
-                                ✓ Already Saved
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted flex items-center gap-3 font-mono">
-                            <span>RVOL: <strong className="text-amber-400">{cand.rvol}x</strong></span>
-                            <span>Range%: <strong className="text-purple-400">{cand.rangePct}%</strong></span>
-                            <span>Close: <strong className="text-foreground">${cand.close.toFixed(2)}</strong></span>
-                          </div>
+            <div className="max-h-[240px] overflow-y-auto space-y-1.5 pr-1">
+              {researchData?.candidates && researchData.candidates.length > 0 ? (
+                researchData.candidates.map((cand: any) => {
+                  const isInsideRange = cand.date >= selectedRange.startDate && cand.date <= selectedRange.endDate;
+                  const isVerified = verifiedRanges[cand.date];
+                  return (
+                    <div
+                      key={cand.date}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between text-xs transition ${
+                        isInsideRange
+                          ? 'bg-emerald-500/15 border-emerald-500/60 shadow-[0_0_10px_rgba(0,255,135,0.15)]'
+                          : 'bg-background/80 border-border hover:border-emerald-500/30'
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span className="font-bold text-amber-400">{cand.date}</span>
+                          {isInsideRange && (
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-sans font-bold">
+                              Matched
+                            </span>
+                          )}
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => saveDatasetDirectly(cand)}
-                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs px-4 py-2 rounded-xl shadow-[0_0_12px_rgba(0,255,135,0.3)] transition active:scale-95 cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Plus className="w-4 h-4" /> Save & Associate →
-                        </button>
+                        <div className="text-[10px] text-muted font-mono flex items-center gap-2">
+                          <span>RVOL: <strong className="text-amber-400">{cand.rvol}x</strong></span>
+                          <span>Range: <strong className="text-purple-400">{cand.rangePct}%</strong></span>
+                        </div>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="p-6 text-center text-muted text-xs italic">
-                    No flagged conviction day candidates available for this ticker. Try adjusting RVOL or Min Range% thresholds.
-                  </div>
-                )}
-              </div>
+
+                      <button
+                        type="button"
+                        onClick={() => saveDatasetDirectly(cand)}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] px-3 py-1.5 rounded-lg shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+                      >
+                        {isVerified ? '✓ Saved' : '+ Save'}
+                      </button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center text-muted text-xs italic">
+                  No conviction days flagged. Lower parameters to find candidates.
+                </div>
+              )}
             </div>
 
-            <div className="pt-3 border-t border-border flex justify-end">
+            <div className="pt-2 border-t border-border flex justify-end">
               <button
                 onClick={() => setIsAssociationModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted hover:text-foreground transition"
+                className="px-3 py-1 rounded-lg border border-border text-xs font-semibold text-muted hover:text-foreground transition"
               >
-                Cancel
+                Close
               </button>
             </div>
           </div>
