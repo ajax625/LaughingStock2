@@ -1,8 +1,27 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// In-memory fallback store for datasets if DB is temporarily unavailable
+// In-memory fallback store for datasets if DB is temporarily unavailable or table missing
 const inMemoryDatasets: Map<string, any> = new Map();
+
+function sanitizeForJSON(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj === 'bigint') return Number(obj);
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForJSON);
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'bigint') {
+      result[key] = Number(val);
+    } else if (typeof val === 'object' && val !== null) {
+      result[key] = sanitizeForJSON(val);
+    } else if (val !== undefined) {
+      result[key] = val;
+    }
+  }
+  return result;
+}
 
 export async function GET(req: Request) {
   try {
@@ -26,12 +45,12 @@ export async function GET(req: Request) {
     // Merge DB datasets and in-memory fallback datasets (dedup by datasetName)
     const dsMap = new Map<string, any>();
     for (const ds of [...dbDatasets, ...memList]) {
-      if (!dsMap.has(ds.datasetName)) {
+      if (ds && ds.datasetName && !dsMap.has(ds.datasetName)) {
         dsMap.set(ds.datasetName, ds);
       }
     }
 
-    return NextResponse.json({ datasets: Array.from(dsMap.values()) });
+    return NextResponse.json(sanitizeForJSON({ datasets: Array.from(dsMap.values()) }));
   } catch (err: any) {
     console.error('Failed to fetch research datasets:', err);
     return NextResponse.json({ error: err.message || 'Failed to fetch datasets' }, { status: 500 });
@@ -40,7 +59,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     const { symbol, convictionDate, roiPct, startDate, endDate, candles } = body;
 
     if (!symbol) {
@@ -73,7 +98,8 @@ export async function POST(req: Request) {
     const roiVal = Number(roiPct) || 5.0;
     const roiStr = roiVal.toFixed(1).replace('.', '_');
     const datasetName = `${sym}_${mmddyyyy}_${roiStr}`;
-    const validCandles = Array.isArray(candles) ? candles : [];
+    const rawCandles = Array.isArray(candles) ? candles : [];
+    const validCandles = sanitizeForJSON(rawCandles);
 
     let dataset: any = null;
 
@@ -82,7 +108,7 @@ export async function POST(req: Request) {
         where: { datasetName },
         update: {
           symbol: sym,
-          convictionDate,
+          convictionDate: targetDate,
           roiPct: roiVal,
           startDate: effectiveStartDate,
           endDate: effectiveEndDate,
@@ -93,7 +119,7 @@ export async function POST(req: Request) {
         create: {
           datasetName,
           symbol: sym,
-          convictionDate,
+          convictionDate: targetDate,
           roiPct: roiVal,
           startDate: effectiveStartDate,
           endDate: effectiveEndDate,
@@ -132,7 +158,7 @@ export async function POST(req: Request) {
         id: `mem-${Date.now()}`,
         datasetName,
         symbol: sym,
-        convictionDate,
+        convictionDate: targetDate,
         roiPct: roiVal,
         startDate: effectiveStartDate,
         endDate: effectiveEndDate,
@@ -144,13 +170,13 @@ export async function POST(req: Request) {
       inMemoryDatasets.set(datasetName, dataset);
     }
 
-    return NextResponse.json({
+    return NextResponse.json(sanitizeForJSON({
       message: `Research dataset '${datasetName}' approved and persisted successfully`,
       dataset,
-    });
+    }));
   } catch (err: any) {
     console.error('Failed to create research dataset:', err?.message || err);
-    return NextResponse.json({ error: err.message || 'Failed to save dataset' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Failed to save dataset' }, { status: 500 });
   }
 }
 

@@ -105,7 +105,13 @@ export default function Home() {
         }),
       });
 
-      const resData = await res.json().catch(() => ({}));
+      const responseText = await res.text().catch(() => '');
+      let resData: any = {};
+      try {
+        resData = JSON.parse(responseText);
+      } catch (e) {
+        // Response is non-JSON or HTML
+      }
 
       if (res.ok) {
         const dsName = resData.dataset?.datasetName || `${researchSymbol}_${candDate}_${roi}`;
@@ -142,8 +148,8 @@ export default function Home() {
         fetchStrategies();
         setIsAssociationModalOpen(false);
       } else {
-        const errMsg = resData.error || resData.message || 'Server error';
-        console.error('Dataset save error:', resData);
+        const errMsg = resData.error || resData.message || (responseText ? responseText.slice(0, 100) : `HTTP ${res.status}`);
+        console.error('Dataset save error:', res.status, responseText);
         alert(`Failed to save research dataset: ${errMsg}`);
       }
     } catch (err: any) {
