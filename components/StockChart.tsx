@@ -6,12 +6,41 @@ import { EnrichedCandle } from '@/lib/conviction-detector';
 interface StockChartProps {
   candles: any[];
   onRangeSelect?: (range: { startDate: string; endDate: string; candleCount: number } | null) => void;
+  theme?: 'dark' | 'light';
 }
 
-export default function StockChart({ candles, onRangeSelect }: StockChartProps) {
+export default function StockChart({ candles, onRangeSelect, theme }: StockChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverCandle, setHoverCandle] = useState<any | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Theme Detection State & MutationObserver
+  const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(theme || 'dark');
+
+  useEffect(() => {
+    if (theme) {
+      setCurrentTheme(theme);
+    }
+    const updateThemeFromDOM = () => {
+      const domTheme = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark';
+      setCurrentTheme(domTheme);
+    };
+
+    updateThemeFromDOM();
+
+    const observer = new MutationObserver(() => {
+      updateThemeFromDOM();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
+  }, [theme]);
+
+  const isLight = currentTheme === 'light';
 
   // Drag-to-Select Date Range State
   const [isDragging, setIsDragging] = useState(false);
@@ -68,6 +97,10 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
 
     ctx.clearRect(0, 0, w, h);
 
+    // Fill background depending on active theme mode
+    ctx.fillStyle = isLight ? '#ffffff' : '#0d1117';
+    ctx.fillRect(0, 0, w, h);
+
     // Min & Max Price Bounds
     const prices = visibleCandles.flatMap((c) => [c.high, c.low, c.medianPriceMA || c.close]);
     const minP = Math.min(...prices) * 0.99;
@@ -90,7 +123,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
     // 1. Draw Grid Lines & Y-Axis Price Scale
     const numYTicks = 4;
     ctx.font = '11px sans-serif';
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = isLight ? '#475569' : '#94a3b8';
     ctx.textAlign = 'left';
     ctx.lineWidth = 1;
 
@@ -98,7 +131,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
       const priceVal = minP + (priceRange / numYTicks) * i;
       const yPos = getPriceY(priceVal);
 
-      ctx.strokeStyle = '#1e293b';
+      ctx.strokeStyle = isLight ? '#cbd5e1' : '#1e293b';
       ctx.beginPath();
       ctx.moveTo(paddingLeft, yPos);
       ctx.lineTo(paddingLeft + chartW, yPos);
@@ -112,14 +145,14 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
     visibleCandles.forEach((c, idx) => {
       if (idx % labelStep === 0 || idx === visibleCandles.length - 1) {
         const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
-        ctx.fillStyle = '#64748b';
+        ctx.fillStyle = isLight ? '#475569' : '#64748b';
         ctx.textAlign = 'center';
         ctx.fillText(c.date.slice(5), xPos, h - 8);
       }
     });
 
     // 3. Draw Volume Sub-Panel Grid & Bars
-    ctx.strokeStyle = '#1e293b';
+    ctx.strokeStyle = isLight ? '#cbd5e1' : '#1e293b';
     ctx.beginPath();
     ctx.moveTo(paddingLeft, volumeTopY);
     ctx.lineTo(paddingLeft + chartW, volumeTopY);
@@ -157,7 +190,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
     visibleCandles.forEach((c, idx) => {
       const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
       const isBull = c.close >= c.open;
-      const color = isBull ? '#22c55e' : '#ef4444';
+      const color = isBull ? (isLight ? '#16a34a' : '#22c55e') : (isLight ? '#dc2626' : '#ef4444');
 
       const openY = getPriceY(c.open);
       const closeY = getPriceY(c.close);
@@ -189,7 +222,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
 
     // 7. Draw Median Price MA Overlay Line (Cyan)
     ctx.beginPath();
-    ctx.strokeStyle = '#06b6d4';
+    ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
     ctx.lineWidth = 2;
     let maStarted = false;
     visibleCandles.forEach((c, idx) => {
@@ -224,11 +257,11 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
       const selWidth = endX - startX;
 
       // Cyan Highlight Box
-      ctx.fillStyle = 'rgba(6, 182, 212, 0.18)';
+      ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.18)' : 'rgba(6, 182, 212, 0.18)';
       ctx.fillRect(startX, paddingTop, selWidth, totalH);
 
       // Cyan Border Lines
-      ctx.strokeStyle = '#06b6d4';
+      ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
       ctx.lineWidth = 1.5;
 
       ctx.beginPath();
@@ -239,7 +272,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
       ctx.stroke();
 
       // Top Range Label Badge
-      ctx.fillStyle = '#06b6d4';
+      ctx.fillStyle = isLight ? '#0284c7' : '#06b6d4';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
       const startDateStr = visibleCandles[highlightStartIdx]?.date || '';
@@ -249,7 +282,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
 
     // 9. Draw Crosshair & Hover Inspector Line
     if (mousePos && mousePos.x >= paddingLeft && mousePos.x <= paddingLeft + chartW) {
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+      ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.4)' : 'rgba(148, 163, 184, 0.4)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
 
@@ -269,7 +302,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
 
       ctx.setLineDash([]);
     }
-  }, [visibleCandles, hoverCandle, mousePos, isDragging, dragStartIdx, dragCurrentIdx, selectedRange]);
+  }, [visibleCandles, hoverCandle, mousePos, isDragging, dragStartIdx, dragCurrentIdx, selectedRange, isLight]);
 
   const getIndexFromX = (x: number) => {
     const canvas = canvasRef.current;
@@ -357,8 +390,10 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
 
   return (
     <div className="space-y-3">
-      {/* Interactive Canvas Container (Fixed Top Position) */}
-      <div className="relative w-full h-[420px] bg-[#0d1117] rounded-lg border border-border overflow-hidden p-2 select-none">
+      {/* Interactive Canvas Container (Theme Responsive) */}
+      <div className={`relative w-full h-[420px] rounded-lg border border-border overflow-hidden p-2 select-none transition-colors duration-200 ${
+        isLight ? 'bg-white' : 'bg-[#0d1117]'
+      }`}>
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}
@@ -376,16 +411,16 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
           {hoverCandle ? (
             <div className="flex items-center gap-3 font-semibold font-mono flex-wrap">
               <span className="text-foreground">Date: {hoverCandle.date}</span>
-              <span className="text-blue-400">Open: ${hoverCandle.open?.toFixed(2)}</span>
-              <span className="text-emerald-400">High: ${hoverCandle.high?.toFixed(2)}</span>
-              <span className="text-rose-400">Low: ${hoverCandle.low?.toFixed(2)}</span>
-              <span className="text-cyan-400">MedianMA: ${hoverCandle.medianPriceMA?.toFixed(2)}</span>
-              <span className="text-amber-400">VolMA: {(hoverCandle.volumeMA / 1e6)?.toFixed(1)}M</span>
+              <span className="text-blue-500">Open: ${hoverCandle.open?.toFixed(2)}</span>
+              <span className="text-emerald-500">High: ${hoverCandle.high?.toFixed(2)}</span>
+              <span className="text-rose-500">Low: ${hoverCandle.low?.toFixed(2)}</span>
+              <span className="text-cyan-500">MedianMA: ${hoverCandle.medianPriceMA?.toFixed(2)}</span>
+              <span className="text-amber-500">VolMA: {(hoverCandle.volumeMA / 1e6)?.toFixed(1)}M</span>
               {hoverCandle.rvol !== undefined && (
-                <span className="text-amber-400 font-bold">RVOL: {hoverCandle.rvol}x</span>
+                <span className="text-amber-500 font-bold">RVOL: {hoverCandle.rvol}x</span>
               )}
               {hoverCandle.rangePct !== undefined && (
-                <span className="text-purple-400 font-bold">Range%: {hoverCandle.rangePct}%</span>
+                <span className="text-purple-500 font-bold">Range%: {hoverCandle.rangePct}%</span>
               )}
               {hoverCandle.isConvictionDay && (
                 <span className="bg-amber-500 text-black px-2 py-0.5 rounded font-bold">
@@ -403,18 +438,18 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
           {selectedRange && (
             <button
               onClick={clearSelection}
-              className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-2 py-0.5 rounded font-bold hover:bg-cyan-500/20 mr-2 cursor-pointer"
+              className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-500 px-2 py-0.5 rounded font-bold hover:bg-cyan-500/20 mr-2 cursor-pointer"
             >
               ✕ Clear Selected Range ({selectedRange.startDate} - {selectedRange.endDate})
             </button>
           )}
-          <span className="flex items-center gap-1 text-cyan-400">
-            <span className="w-3 h-0.5 bg-cyan-400"></span> MedianPriceMA
+          <span className="flex items-center gap-1 text-cyan-500 font-bold">
+            <span className="w-3 h-0.5 bg-cyan-500"></span> MedianPriceMA
           </span>
-          <span className="flex items-center gap-1 text-amber-400">
-            <span className="w-3 h-0.5 bg-amber-400"></span> VolumeMA
+          <span className="flex items-center gap-1 text-amber-500 font-bold">
+            <span className="w-3 h-0.5 bg-amber-500"></span> VolumeMA
           </span>
-          <span className="flex items-center gap-1 text-amber-500">
+          <span className="flex items-center gap-1 text-amber-500 font-bold">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span> ★ Conviction Day
           </span>
         </div>
@@ -437,7 +472,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
                 }}
                 className={`px-3 py-1.5 rounded-lg font-extrabold text-xs transition cursor-pointer ${
                   isSelected
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_10px_rgba(0,255,135,0.2)]'
+                    ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/50 shadow-[0_0_10px_rgba(0,255,135,0.2)]'
                     : 'bg-background text-muted-foreground border border-border hover:text-foreground hover:bg-card/60'
                 }`}
               >
@@ -453,22 +488,24 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
             <span className="text-muted-foreground font-semibold flex items-center gap-2">
               <span>Slide 365D Timeline:</span>
               {is365View ? (
-                <span className="text-amber-400 font-mono text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-amber-500 font-mono text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
                   🔒 Slider Disabled in 365D View
                 </span>
               ) : (
-                <span className="text-emerald-400 font-mono text-[10px]">
+                <span className="text-emerald-500 font-mono text-[10px] font-bold">
                   (Bars {startIndex + 1} – {Math.min(totalCandlesCount, startIndex + visibleCount)} of {totalCandlesCount})
                 </span>
               )}
             </span>
-            <span className="text-emerald-400 font-mono font-bold">
+            <span className="text-emerald-500 font-mono font-bold">
               {visibleCandles[0]?.date} → {visibleCandles[visibleCandles.length - 1]?.date}
             </span>
           </div>
 
-          {/* Timeline Track Container with Plotted Conviction Day Bars */}
-          <div className="relative w-full h-8 bg-slate-950 border border-border rounded-lg overflow-hidden flex items-center px-1">
+          {/* Timeline Track Container (Theme Responsive) */}
+          <div className={`relative w-full h-8 rounded-lg border border-border overflow-hidden flex items-center px-1 transition-colors duration-200 ${
+            isLight ? 'bg-slate-100' : 'bg-slate-950'
+          }`}>
             {/* 1. Conviction Day Vertical Bars Heatmap Plot */}
             <div className="absolute inset-0 w-full h-full pointer-events-none flex items-center">
               {candles && candles.length > 0 && candles.map((c, idx) => {
@@ -477,7 +514,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
                 return (
                   <div
                     key={idx}
-                    className="absolute top-0 bottom-0 w-[3px] bg-amber-400 shadow-[0_0_6px_#f59e0b] z-10"
+                    className="absolute top-0 bottom-0 w-[3px] bg-amber-500 shadow-[0_0_6px_#f59e0b] z-10"
                     style={{ left: `${leftPct}%` }}
                     title={`★ Conviction Day: ${c.date} (RVOL: ${c.rvol}x, Range%: ${c.rangePct}%)`}
                   />
@@ -488,7 +525,11 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
             {/* 2. Active Range Highlight Box on Timeline Track */}
             {totalCandlesCount > 0 && !is365View && (
               <div
-                className="absolute top-1 bottom-1 bg-emerald-500/20 border border-emerald-500/50 rounded pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(0,255,135,0.3)] z-15"
+                className={`absolute top-1 bottom-1 rounded pointer-events-none transition-all duration-75 border z-15 ${
+                  isLight
+                    ? 'bg-emerald-500/30 border-emerald-600/70 shadow-[0_0_8px_rgba(5,150,105,0.25)]'
+                    : 'bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_10px_rgba(0,255,135,0.3)]'
+                }`}
                 style={{
                   left: `${(startIndex / totalCandlesCount) * 100}%`,
                   width: `${(visibleCount / totalCandlesCount) * 100}%`,
@@ -504,7 +545,7 @@ export default function StockChart({ candles, onRangeSelect }: StockChartProps) 
               disabled={is365View}
               value={is365View ? 0 : startIndex}
               onChange={(e) => setStartIndex(Number(e.target.value))}
-              className="w-full h-full opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed accent-emerald-400 cursor-pointer relative z-20"
+              className="w-full h-full opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed accent-emerald-500 cursor-pointer relative z-20"
             />
           </div>
         </div>

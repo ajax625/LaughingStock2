@@ -1050,7 +1050,7 @@ export default function Home() {
               </div>
             </div>
 
-            <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} />
+            <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} theme={theme} />
           </div>
         </section>
       )}
