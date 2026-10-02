@@ -43,24 +43,40 @@ jobs:
         env:
           VPS_USER_SECRET: ${{ secrets.VPS_USER }}
           VPS_HOST_SECRET: ${{ secrets.VPS_HOST }}
-          APP_ENV: |
-            POSTGRES_USER=${{ secrets.POSTGRES_USER || 'laughingstock' }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || 'laughingstockpass123' }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB || 'laughingstock2_prod' }}
-            DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER || 'laughingstock' }}:${{ secrets.POSTGRES_PASSWORD || 'laughingstockpass123' }}@db:5432/${{ secrets.POSTGRES_DB || 'laughingstock2_prod' }}?schema=public
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET || 'laughingstock_super_secret_jwt_key_2026' }}
-            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
-            JEV_API_ENDPOINT=${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
-            MARKET_DATA_PROVIDER=${{ secrets.MARKET_DATA_PROVIDER || 'alpaca' }}
-            ALPACA_PAPER=${{ secrets.ALPACA_PAPER || 'true' }}
-            ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }}
-            ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }}
-            ALPACA_BASE_URL=${{ secrets.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2' }}
+          DATABASE_URL_VAL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET_VAL: ${{ secrets.NEXTAUTH_SECRET || 'laughingstock_super_secret_jwt_key_2026' }}
+          NEXTAUTH_URL_VAL: ${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
+          JEV_API_ENDPOINT_VAL: ${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
+          MARKET_DATA_PROVIDER_VAL: ${{ secrets.MARKET_DATA_PROVIDER || 'alpaca' }}
+          ALPACA_PAPER_VAL: ${{ secrets.ALPACA_PAPER || 'true' }}
+          ALPACA_API_KEY_VAL: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY_VAL: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL_VAL: ${{ secrets.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2' }}
         run: |
           VPS_USER="${VPS_USER_SECRET:-root}"
           VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
           ssh "$VPS_USER@$VPS_HOST" "mkdir -p ~/laughingstock2"
-          echo "$APP_ENV" | ssh "$VPS_USER@$VPS_HOST" "cat > ~/laughingstock2/.env"
+          ssh "$VPS_USER@$VPS_HOST" << ENDSSH
+          if [ ! -f ~/laughingstock2/.env ]; then
+            cat << 'EOF' > ~/laughingstock2/.env
+NEXTAUTH_SECRET="$NEXTAUTH_SECRET_VAL"
+NEXTAUTH_URL="$NEXTAUTH_URL_VAL"
+JEV_API_ENDPOINT="$JEV_API_ENDPOINT_VAL"
+MARKET_DATA_PROVIDER="$MARKET_DATA_PROVIDER_VAL"
+ALPACA_PAPER="$ALPACA_PAPER_VAL"
+ALPACA_API_KEY="$ALPACA_API_KEY_VAL"
+ALPACA_SECRET_KEY="$ALPACA_SECRET_KEY_VAL"
+ALPACA_BASE_URL="$ALPACA_BASE_URL_VAL"
+EOF
+          fi
+          if [ -n "$DATABASE_URL_VAL" ]; then
+            if grep -q "^DATABASE_URL=" ~/laughingstock2/.env; then
+              sed -i "s|^DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL_VAL|" ~/laughingstock2/.env
+            else
+              echo "DATABASE_URL=$DATABASE_URL_VAL" >> ~/laughingstock2/.env
+            fi
+          fi
+          ENDSSH
 
       - name: Build and Start Containers via Docker Compose
         env:
