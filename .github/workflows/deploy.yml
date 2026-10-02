@@ -90,6 +90,8 @@ jobs:
           cd ~/laughingstock2
 
           docker compose build
-          docker compose up -d
+          docker compose up -d --remove-orphans
+          sleep 3
           docker compose ps
+          docker compose logs --tail=30
           ENDSSH

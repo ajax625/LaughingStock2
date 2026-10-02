@@ -20,7 +20,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.laughingstock2.rule=Host(`ls.informatrixlabs.com`)"
-      - "traefik.http.routers.laughingstock2.entrypoints=websecure"
+      - "traefik.http.routers.laughingstock2.entrypoints=web,websecure"
+      - "traefik.http.routers.laughingstock2.tls=true"
       - "traefik.http.routers.laughingstock2.tls.certresolver=letsencrypt"
       - "traefik.http.services.laughingstock2.loadbalancer.server.port=9999"
 

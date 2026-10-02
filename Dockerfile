@@ -35,4 +35,4 @@ COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 9999
 
-CMD ["sh", "-c", "npx prisma db push && npm run start"]
+CMD ["sh", "-c", "npx prisma db push || echo 'Prisma db push skipped or failed'; exec npm run start"]
