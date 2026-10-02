@@ -1,38 +1,21 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: laughingstock2_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-laughingstock}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-laughingstockpass123}
-      POSTGRES_DB: ${POSTGRES_DB:-laughingstock2_prod}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - internal
-
   web:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: laughingstock2_web
     restart: unless-stopped
-    depends_on:
-      - db
     ports:
       - "9999:9999"
     environment:
       PORT: "9999"
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-laughingstock}:${POSTGRES_PASSWORD:-laughingstockpass123}@db:5432/${POSTGRES_DB:-laughingstock2_prod}?schema=public"
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - internal
       - proxy
     labels:
       - "traefik.enable=true"
@@ -41,11 +24,6 @@ services:
       - "traefik.http.routers.laughingstock2.tls.certresolver=letsencrypt"
       - "traefik.http.services.laughingstock2.loadbalancer.server.port=9999"
 
-volumes:
-  pgdata:
-
 networks:
-  internal:
-    driver: bridge
   proxy:
     external: true
