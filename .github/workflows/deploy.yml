@@ -44,14 +44,6 @@ jobs:
           VPS_USER_SECRET: ${{ secrets.VPS_USER }}
           VPS_HOST_SECRET: ${{ secrets.VPS_HOST }}
           DATABASE_URL_VAL: ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET_VAL: ${{ secrets.NEXTAUTH_SECRET || 'laughingstock_super_secret_jwt_key_2026' }}
-          NEXTAUTH_URL_VAL: ${{ secrets.NEXTAUTH_URL || 'https://ls.informatrixlabs.com' }}
-          JEV_API_ENDPOINT_VAL: ${{ secrets.JEV_API_ENDPOINT || 'http://localhost:3000/api/jev-mock' }}
-          MARKET_DATA_PROVIDER_VAL: ${{ secrets.MARKET_DATA_PROVIDER || 'alpaca' }}
-          ALPACA_PAPER_VAL: ${{ secrets.ALPACA_PAPER || 'true' }}
-          ALPACA_API_KEY_VAL: ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY_VAL: ${{ secrets.ALPACA_SECRET_KEY }}
-          ALPACA_BASE_URL_VAL: ${{ secrets.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2' }}
         run: |
           VPS_USER="${VPS_USER_SECRET:-root}"
           VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
@@ -59,22 +51,18 @@ jobs:
           ssh "$VPS_USER@$VPS_HOST" "bash -s" << 'ENDSSH'
           if [ ! -f ~/laughingstock2/.env ]; then
             cat << 'EOF' > ~/laughingstock2/.env
-          NEXTAUTH_SECRET="${NEXTAUTH_SECRET_VAL:-laughingstock_super_secret_jwt_key_2026}"
-          NEXTAUTH_URL="${NEXTAUTH_URL_VAL:-https://ls.informatrixlabs.com}"
-          JEV_API_ENDPOINT="${JEV_API_ENDPOINT_VAL:-http://localhost:3000/api/jev-mock}"
-          MARKET_DATA_PROVIDER="${MARKET_DATA_PROVIDER_VAL:-alpaca}"
-          ALPACA_PAPER="${ALPACA_PAPER_VAL:-true}"
-          ALPACA_API_KEY="${ALPACA_API_KEY_VAL}"
-          ALPACA_SECRET_KEY="${ALPACA_SECRET_KEY_VAL}"
-          ALPACA_BASE_URL="${ALPACA_BASE_URL_VAL:-https://paper-api.alpaca.markets/v2}"
-          EOF
+NEXTAUTH_SECRET="laughingstock_super_secret_jwt_key_2026"
+NEXTAUTH_URL="https://ls.informatrixlabs.com"
+JEV_API_ENDPOINT="http://localhost:3000/api/jev-mock"
+MARKET_DATA_PROVIDER="alpaca"
+ALPACA_PAPER="true"
+ALPACA_BASE_URL="https://paper-api.alpaca.markets/v2"
+EOF
           fi
-          if [ -n "$DATABASE_URL_VAL" ]; then
-            if grep -q "^DATABASE_URL=" ~/laughingstock2/.env; then
-              sed -i "s|^DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL_VAL|" ~/laughingstock2/.env
-            else
-              echo "DATABASE_URL=$DATABASE_URL_VAL" >> ~/laughingstock2/.env
-            fi
+
+          # Never overwrite DATABASE_URL if it already exists on the server's .env file
+          if [ -n "$DATABASE_URL_VAL" ] && ! grep -q "^DATABASE_URL=" ~/laughingstock2/.env 2>/dev/null; then
+            echo "DATABASE_URL=$DATABASE_URL_VAL" >> ~/laughingstock2/.env
           fi
           ENDSSH
 
