@@ -56,18 +56,18 @@ jobs:
           VPS_USER="${VPS_USER_SECRET:-root}"
           VPS_HOST="${VPS_HOST_SECRET:-45.132.240.168}"
           ssh "$VPS_USER@$VPS_HOST" "mkdir -p ~/laughingstock2"
-          ssh "$VPS_USER@$VPS_HOST" << ENDSSH
+          ssh "$VPS_USER@$VPS_HOST" "bash -s" << 'ENDSSH'
           if [ ! -f ~/laughingstock2/.env ]; then
             cat << 'EOF' > ~/laughingstock2/.env
-NEXTAUTH_SECRET="$NEXTAUTH_SECRET_VAL"
-NEXTAUTH_URL="$NEXTAUTH_URL_VAL"
-JEV_API_ENDPOINT="$JEV_API_ENDPOINT_VAL"
-MARKET_DATA_PROVIDER="$MARKET_DATA_PROVIDER_VAL"
-ALPACA_PAPER="$ALPACA_PAPER_VAL"
-ALPACA_API_KEY="$ALPACA_API_KEY_VAL"
-ALPACA_SECRET_KEY="$ALPACA_SECRET_KEY_VAL"
-ALPACA_BASE_URL="$ALPACA_BASE_URL_VAL"
-EOF
+          NEXTAUTH_SECRET="${NEXTAUTH_SECRET_VAL:-laughingstock_super_secret_jwt_key_2026}"
+          NEXTAUTH_URL="${NEXTAUTH_URL_VAL:-https://ls.informatrixlabs.com}"
+          JEV_API_ENDPOINT="${JEV_API_ENDPOINT_VAL:-http://localhost:3000/api/jev-mock}"
+          MARKET_DATA_PROVIDER="${MARKET_DATA_PROVIDER_VAL:-alpaca}"
+          ALPACA_PAPER="${ALPACA_PAPER_VAL:-true}"
+          ALPACA_API_KEY="${ALPACA_API_KEY_VAL}"
+          ALPACA_SECRET_KEY="${ALPACA_SECRET_KEY_VAL}"
+          ALPACA_BASE_URL="${ALPACA_BASE_URL_VAL:-https://paper-api.alpaca.markets/v2}"
+          EOF
           fi
           if [ -n "$DATABASE_URL_VAL" ]; then
             if grep -q "^DATABASE_URL=" ~/laughingstock2/.env; then
