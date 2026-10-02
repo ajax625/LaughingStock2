@@ -8,6 +8,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-laughingstock}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-laughingstockpass123}
       POSTGRES_DB: ${POSTGRES_DB:-laughingstock2_prod}
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -26,6 +28,7 @@ services:
       - "9999:9999"
     environment:
       PORT: "9999"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-laughingstock}:${POSTGRES_PASSWORD:-laughingstockpass123}@db:5432/${POSTGRES_DB:-laughingstock2_prod}?schema=public"
     env_file:
       - .env
     networks:
