@@ -17,6 +17,7 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - proxy
+      - db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.laughingstock2.rule=Host(`ls.informatrixlabs.com`)"
@@ -28,3 +29,6 @@ services:
 networks:
   proxy:
     external: true
+  db:
+    external: true
+    name: vps-database_internal
