@@ -217,8 +217,13 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
       const rectH = Math.max(2, Math.abs(openY - closeY));
       ctx.fillRect(xPos - barWidth / 2 + 0.5, rectTop, Math.max(1, barWidth - 1), rectH);
 
-      // 6. Draw Gold Star (★ Badge) for Conviction Days
-      if (c.isConvictionDay) {
+      // 6. Draw Gold Star (★ Badge) for Conviction Days or 🎯 Target Badge for Optimal Signals
+      if (c.isOptimalSignal) {
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#22c55e';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎯 BUY', xPos, highY - 8);
+      } else if (c.isConvictionDay) {
         ctx.font = 'bold 14px sans-serif';
         ctx.fillStyle = '#eab308';
         ctx.textAlign = 'center';
@@ -238,6 +243,25 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
         if (!maStarted) {
           ctx.moveTo(xPos, yPos);
           maStarted = true;
+        } else {
+          ctx.lineTo(xPos, yPos);
+        }
+      }
+    });
+    ctx.stroke();
+
+    // 7b. Draw Variable Index Dynamic Average (VIDYA Line - Purple)
+    ctx.beginPath();
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 2;
+    let vidyaStarted = false;
+    visibleCandles.forEach((c, idx) => {
+      if (c.vidya !== undefined) {
+        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+        const yPos = getPriceY(c.vidya);
+        if (!vidyaStarted) {
+          ctx.moveTo(xPos, yPos);
+          vidyaStarted = true;
         } else {
           ctx.lineTo(xPos, yPos);
         }
@@ -431,11 +455,19 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
               <span className="text-rose-500">Low: ${hoverCandle.low?.toFixed(2)}</span>
               <span className="text-cyan-500">MedianMA: ${hoverCandle.medianPriceMA?.toFixed(2)}</span>
               <span className="text-amber-500">VolMA: {(hoverCandle.volumeMA / 1e6)?.toFixed(1)}M</span>
-              {hoverCandle.rvol !== undefined && (
-                <span className="text-amber-500 font-bold">RVOL: {hoverCandle.rvol}x</span>
+              {hoverCandle.cmo !== undefined && (
+                <span className="text-purple-400 font-bold">CMO: {hoverCandle.cmo}</span>
               )}
-              {hoverCandle.rangePct !== undefined && (
-                <span className="text-purple-500 font-bold">Range%: {hoverCandle.rangePct}%</span>
+              {hoverCandle.trendScore !== undefined && (
+                <span className="text-emerald-400 font-bold">TrendScore: {hoverCandle.trendScore}</span>
+              )}
+              {hoverCandle.vidya !== undefined && (
+                <span className="text-purple-300 font-bold">VIDYA: ${hoverCandle.vidya?.toFixed(2)}</span>
+              )}
+              {hoverCandle.isOptimalSignal && (
+                <span className="bg-emerald-500 text-black px-2 py-0.5 rounded font-bold">
+                  🎯 OPTIMAL BUY (+{hoverCandle.expectedMovePct}%)
+                </span>
               )}
               {hoverCandle.isConvictionDay && (
                 <span className="bg-amber-500 text-black px-2 py-0.5 rounded font-bold">
@@ -449,7 +481,7 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
         </div>
 
         {/* Legend Indicators */}
-        <div className="text-muted-foreground text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0">
+        <div className="text-muted-foreground text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0 flex-wrap">
           {selectedRange && (
             <button
               onClick={clearSelection}
@@ -458,8 +490,17 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
               ✕ Clear Selected Range ({selectedRange.startDate} - {selectedRange.endDate})
             </button>
           )}
+          <span className="flex items-center gap-1 text-purple-400 font-bold">
+            <span className="w-3 h-0.5 bg-purple-400"></span> VIDYA
+          </span>
           <span className="flex items-center gap-1 text-cyan-500 font-bold">
-            <span className="w-3 h-0.5 bg-cyan-500"></span> MedianPriceMA
+            <span className="w-3 h-0.5 bg-cyan-500"></span> MedianMA
+          </span>
+          <span className="flex items-center gap-1 text-amber-500 font-bold">
+            <span className="w-3 h-0.5 bg-amber-500"></span> VolumeMA
+          </span>
+          <span className="flex items-center gap-1 text-emerald-400 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span> 🎯 Optimal Signal
           </span>
           <span className="flex items-center gap-1 text-amber-500 font-bold">
             <span className="w-3 h-0.5 bg-amber-500"></span> VolumeMA

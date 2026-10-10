@@ -77,6 +77,12 @@ export default function Home() {
   const [harvestChartInterval, setHarvestChartInterval] = useState<HarvestTimeframe>('5m');
   const [loadingHarvestChart, setLoadingHarvestChart] = useState<boolean>(false);
 
+  // Phase 3 Chande Analysis & Signal Back-Trace State
+  const [selectedAnalyzerDatasetId, setSelectedAnalyzerDatasetId] = useState<string>('');
+  const [analyzerTargetMovePct, setAnalyzerTargetMovePct] = useState<number>(2.0);
+  const [chandeAnalysisResult, setChandeAnalysisResult] = useState<any>(null);
+  const [loadingChandeAnalysis, setLoadingChandeAnalysis] = useState<boolean>(false);
+
   const fetchHarvestedCandles = async (ds: any) => {
     setSelectedHarvestDataset(ds);
     setLoadingHarvestChart(true);
@@ -621,6 +627,43 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Failed to run miner:', err);
+    }
+  };
+
+  const runChandeAnalysis = async (targetDsId?: string) => {
+    const dsId = targetDsId || selectedAnalyzerDatasetId;
+    if (!dsId) {
+      setToastMessage('⚠️ Please select a 5m harvested dataset to run Chande Analysis.');
+      setTimeout(() => setToastMessage(null), 3500);
+      return;
+    }
+
+    setLoadingChandeAnalysis(true);
+    try {
+      const res = await fetch(`/api/research/datasets/${dsId}/chande-analysis?movePct=${analyzerTargetMovePct}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChandeAnalysisResult(data);
+        setMinerResult({
+          miningResult: {
+            symbol: data.symbol,
+            jevPrompt: data.jevPrompt,
+            moveThresholdPct: analyzerTargetMovePct,
+            lookaheadDays: 1,
+            lookbackBars: 6,
+          },
+          jevEvaluation: data.jevEvaluation,
+        });
+        setToastMessage(`⚡ Chande Analysis complete! ${data.signalsCount} optimal signal(s) identified for ${data.symbol}.`);
+      } else {
+        setToastMessage('⚠️ Failed to run Chande Analysis on dataset.');
+      }
+    } catch (err) {
+      console.error('Chande analysis error:', err);
+      setToastMessage('⚠️ Chande Analysis execution failed.');
+    } finally {
+      setLoadingChandeAnalysis(false);
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -1480,152 +1523,247 @@ export default function Home() {
         </section>
       )}
 
-      {/* VIEW 5: PHASE 3 ANALYSIS & STRATEGY FORMALIZATION */}
+      {/* VIEW 5: PHASE 3 CHANDE ANALYSIS & STRATEGY FORMALIZATION */}
       {activeTab === 'analyzer' && (
         <section className="space-y-6">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
-            <div className="flex justify-between items-center">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center flex-wrap gap-2">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <FlaskConical className="w-6 h-6 text-purple-400" /> Phase 3: Analysis & Strategy Formalization
+                  <FlaskConical className="w-6 h-6 text-purple-400" /> Phase 3: Chande Indicator Enrichment & Strategy Analyzer
                 </h2>
                 <p className="text-xs text-muted mt-1">
-                  Analyzes pre-move technical fingerprints, constructs JEV prompts, and outputs Typeface.ai JEV action scores.
+                  Enriches 5m harvested datasets with Tushar Chande's momentum & trend indicators (CMO, TrendScore, VIDYA, DMI, RVOL), back-traces optimal signal fire points, and ranks indicator conclusiveness.
                 </p>
               </div>
-              <span className="text-xs font-mono bg-purple-500/20 text-purple-400 border border-purple-500/40 px-3 py-1 rounded-full">
-                Typeface.ai JEV Engine
+              <span className="text-xs font-mono bg-purple-500/20 text-purple-400 border border-purple-500/40 px-3 py-1 rounded-full font-bold">
+                Typeface.ai JEV Chande Engine
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
-              <div>
-                <label className="text-xs text-muted font-semibold block mb-1">Target Symbol</label>
-                <input
-                  type="text"
-                  value={minerSymbol}
-                  onChange={(e) => setMinerSymbol(e.target.value.toUpperCase())}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-bold uppercase text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted font-semibold block mb-1">Move Threshold (%)</label>
-                <input
-                  type="number"
-                  value={minerPct}
-                  onChange={(e) => setMinerPct(Number(e.target.value))}
-                  step="0.5"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted font-semibold block mb-1">Lookahead (Days)</label>
-                <input
-                  type="number"
-                  value={minerDays}
-                  onChange={(e) => setMinerDays(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted font-semibold block mb-1">Pre-Move Window (Bars)</label>
-                <input
-                  type="number"
-                  value={minerBars}
-                  onChange={(e) => setMinerBars(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={() => runMiner()}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm py-2 rounded-lg shadow-md transition flex items-center justify-center gap-1.5"
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 items-end">
+              <div className="md:col-span-1">
+                <label className="text-xs text-muted font-bold block mb-1">Select Harvested 5m Dataset</label>
+                <select
+                  value={selectedAnalyzerDatasetId}
+                  onChange={(e) => {
+                    setSelectedAnalyzerDatasetId(e.target.value);
+                    if (e.target.value) {
+                      runChandeAnalysis(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-xs font-bold text-amber-400 focus:outline-none focus:border-purple-500"
                 >
-                  <Sparkles className="w-4 h-4" /> Run Analysis
+                  <option value="">-- Select Harvested Dataset ({savedDatasets.length} Available) --</option>
+                  {savedDatasets.map((ds: any) => (
+                    <option key={ds.id || ds.datasetName} value={ds.id}>
+                      {ds.datasetName} ({ds.symbol} • {ds.convictionDate} • {ds.roiPct}% ROI)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted font-bold block mb-1">Target Price Move Potential (%)</label>
+                <input
+                  type="number"
+                  value={analyzerTargetMovePct}
+                  onChange={(e) => setAnalyzerTargetMovePct(Number(e.target.value))}
+                  step="0.5"
+                  min="0.5"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold font-mono text-purple-400"
+                />
+              </div>
+
+              <div>
+                <button
+                  onClick={() => runChandeAnalysis()}
+                  disabled={loadingChandeAnalysis || !selectedAnalyzerDatasetId}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-2.5 rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" /> {loadingChandeAnalysis ? 'Analyzing Chande Indicators...' : '⚡ Run Chande Analysis & Back-Trace'}
                 </button>
               </div>
             </div>
           </div>
 
-          {minerResult && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Interactive Enriched Chart & Back-Trace Display */}
+          {chandeAnalysisResult ? (
+            <div className="space-y-6">
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
-                  <span>📝 Typeface.ai JEV Model Prompt</span>
-                  <span className="text-xs text-emerald-500 font-normal">Auto-Generated</span>
-                </h3>
-                <textarea
-                  readOnly
-                  value={minerResult.miningResult.jevPrompt}
-                  className="w-full h-64 bg-[#0d1117] text-emerald-400 font-mono text-xs p-3 rounded-lg border border-border focus:outline-none leading-relaxed"
+                <div className="flex justify-between items-center flex-wrap gap-2 border-b border-border pb-3">
+                  <div>
+                    <h3 className="font-bold text-md text-foreground flex items-center gap-2">
+                      <BarChart2 className="w-5 h-5 text-purple-400" /> Enriched 5m Candlestick Chart: <span className="font-mono text-amber-400">{chandeAnalysisResult.symbol}</span>
+                    </h3>
+                    <p className="text-xs text-muted mt-0.5 font-mono">
+                      Dataset Bars: <strong className="text-cyan-400">{chandeAnalysisResult.totalBars}</strong> • Identified Optimal Entry Signals: <strong className="text-emerald-400">{chandeAnalysisResult.signalsCount} (🎯 Badges Rendered Below)</strong>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2.5 py-1 rounded font-bold">
+                      🟣 VIDYA Overlay Active
+                    </span>
+                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded font-bold">
+                      🎯 Signal Back-Trace Active
+                    </span>
+                  </div>
+                </div>
+
+                <StockChart
+                  candles={chandeAnalysisResult.candles}
+                  theme={theme}
+                  zoomPresets={[
+                    { label: '1H', count: 12 },
+                    { label: '2H', count: 24 },
+                    { label: '4H', count: 48 },
+                    { label: '1D', count: 78 },
+                    { label: 'ALL', count: chandeAnalysisResult.candles.length },
+                  ]}
                 />
-                <button
-                  onClick={saveStrategy}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-2 rounded-lg shadow transition"
-                >
-                  💾 Adopt Strategy into App Universe
-                </button>
               </div>
 
+              {/* Indicator Attribution Ranking Table */}
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
-                  <span>🧠 Typeface.ai JEV Deterministic Action Scores</span>
-                  <span className="text-xs text-purple-400 font-semibold bg-purple-500/20 px-2 py-0.5 rounded">Evaluated</span>
-                </h3>
-
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-emerald-400">BUY (Long Entry)</span>
-                      <span className="text-emerald-400">{minerResult.jevEvaluation.probabilities.BUY}%</span>
-                    </div>
-                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.BUY}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-blue-400">HOLD (Maintain Position)</span>
-                      <span className="text-blue-400">{minerResult.jevEvaluation.probabilities.HOLD}%</span>
-                    </div>
-                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
-                      <div className="bg-blue-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.HOLD}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-rose-400">SELL (Exit Position)</span>
-                      <span className="text-rose-400">{minerResult.jevEvaluation.probabilities.SELL}%</span>
-                    </div>
-                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
-                      <div className="bg-rose-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.SELL}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-amber-400">SHORT (Short Entry)</span>
-                      <span className="text-amber-400">{minerResult.jevEvaluation.probabilities.SHORT}%</span>
-                    </div>
-                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.SHORT}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-gray-400">NONE (Do Not Make Any Move)</span>
-                      <span className="text-gray-400">{minerResult.jevEvaluation.probabilities.NONE}%</span>
-                    </div>
-                    <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
-                      <div className="bg-gray-500 h-full rounded-full" style={{ width: `${minerResult.jevEvaluation.probabilities.NONE}%` }} />
-                    </div>
-                  </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <h3 className="font-bold text-md flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-400" /> Chande Indicator Attribution & Predictive Power Rankings
+                  </h3>
+                  <span className="text-xs font-mono text-muted">Evaluated across dataset signal fire points</span>
                 </div>
 
-                <div className="p-3 bg-background rounded-lg border border-border text-xs space-y-1">
-                  <div className="font-bold text-foreground">Typeface.ai JEV Rationale:</div>
-                  <p className="text-muted">{minerResult.jevEvaluation.rationale}</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-xs text-muted border-b border-border uppercase">
+                      <tr>
+                        <th className="pb-3">Indicator Name</th>
+                        <th className="pb-3">Code</th>
+                        <th className="pb-3">Predictive Conclusiveness</th>
+                        <th className="pb-3">Accuracy / Win Rate</th>
+                        <th className="pb-3">Lead Time</th>
+                        <th className="pb-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border font-medium">
+                      {chandeAnalysisResult.attributions.map((attr: any) => (
+                        <tr key={attr.code} className="hover:bg-background/50 transition">
+                          <td className="py-3">
+                            <div className="font-bold text-foreground">{attr.name}</div>
+                            <div className="text-xs text-muted">{attr.description}</div>
+                          </td>
+                          <td className="font-mono text-purple-400 font-bold text-xs">{attr.code}</td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-emerald-400 w-12">{attr.conclusiveness}%</span>
+                              <div className="w-32 bg-background h-2 rounded-full overflow-hidden border border-border">
+                                <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${attr.conclusiveness}%` }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-xs font-bold text-cyan-400">{attr.accuracy}%</td>
+                          <td className="text-xs font-mono text-amber-400">{attr.avgLeadTimeBars} bars ({attr.avgLeadTimeBars * 5}m)</td>
+                          <td>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              attr.status === 'HIGH' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                            }`}>
+                              {attr.status} CORRELATION
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+
+              {/* JEV Strategy Prompt & Action Probabilities */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                  <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
+                    <span>📝 Typeface.ai JEV Strategy Prompt</span>
+                    <span className="text-xs text-emerald-500 font-normal">Auto-Generated from Chande Rules</span>
+                  </h3>
+                  <textarea
+                    readOnly
+                    value={chandeAnalysisResult.jevPrompt}
+                    className="w-full h-64 bg-[#0d1117] text-emerald-400 font-mono text-xs p-3 rounded-lg border border-border focus:outline-none leading-relaxed"
+                  />
+                  <button
+                    onClick={saveStrategy}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-2 rounded-lg shadow transition cursor-pointer"
+                  >
+                    💾 Adopt Strategy into App Universe
+                  </button>
+                </div>
+
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                  <h3 className="font-bold text-md border-b border-border pb-2 flex justify-between items-center">
+                    <span>🧠 Typeface.ai JEV Deterministic Action Scores</span>
+                    <span className="text-xs text-purple-400 font-semibold bg-purple-500/20 px-2 py-0.5 rounded">Evaluated</span>
+                  </h3>
+
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-emerald-400">BUY (Long Entry)</span>
+                        <span className="text-emerald-400">{chandeAnalysisResult.jevEvaluation.probabilities.BUY}%</span>
+                      </div>
+                      <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${chandeAnalysisResult.jevEvaluation.probabilities.BUY}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-blue-400">HOLD (Maintain Position)</span>
+                        <span className="text-blue-400">{chandeAnalysisResult.jevEvaluation.probabilities.HOLD}%</span>
+                      </div>
+                      <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${chandeAnalysisResult.jevEvaluation.probabilities.HOLD}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-rose-400">SELL (Exit Position)</span>
+                        <span className="text-rose-400">{chandeAnalysisResult.jevEvaluation.probabilities.SELL}%</span>
+                      </div>
+                      <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                        <div className="bg-rose-500 h-full rounded-full" style={{ width: `${chandeAnalysisResult.jevEvaluation.probabilities.SELL}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-amber-400">SHORT (Short Entry)</span>
+                        <span className="text-amber-400">{chandeAnalysisResult.jevEvaluation.probabilities.SHORT}%</span>
+                      </div>
+                      <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                        <div className="bg-amber-500 h-full rounded-full" style={{ width: `${chandeAnalysisResult.jevEvaluation.probabilities.SHORT}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1">
+                        <span className="text-gray-400">NONE (Do Not Make Any Move)</span>
+                        <span className="text-gray-400">{chandeAnalysisResult.jevEvaluation.probabilities.NONE}%</span>
+                      </div>
+                      <div className="w-full bg-background h-3 rounded-full overflow-hidden border border-border">
+                        <div className="bg-gray-500 h-full rounded-full" style={{ width: `${chandeAnalysisResult.jevEvaluation.probabilities.NONE}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-background rounded-lg border border-border text-xs space-y-1">
+                    <div className="font-bold text-foreground">Typeface.ai JEV Rationale:</div>
+                    <p className="text-muted">{chandeAnalysisResult.jevEvaluation.rationale}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-16 text-center space-y-3">
+              <FlaskConical className="w-12 h-12 text-purple-400/50 mx-auto" />
+              <h4 className="font-bold text-sm text-foreground">Select a Harvested 5m Dataset Above to Begin Chande Analysis</h4>
+              <p className="text-xs text-muted max-w-md mx-auto">
+                Choose any persisted 5m dataset from Phase 2 in the dropdown above to enrich its market candles with <span className="text-purple-400 font-semibold font-mono">Chande Momentum Oscillator (CMO), TrendScore, VIDYA, DMI</span> and back-trace optimal entry signal points.
+              </p>
             </div>
           )}
         </section>
