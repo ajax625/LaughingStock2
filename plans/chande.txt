@@ -1,0 +1,133 @@
+import numpy as np
+import pandas as pd
+
+# ------------------------------------------------------------------
+# 1. INDICATOR ENGINE
+# ------------------------------------------------------------------
+def calculate_cmo(close: pd.Series, period: int = 14) -> pd.Series:
+    """Calculates the Chande Momentum Oscillator (CMO)."""
+    delta = close.diff()
+    up = delta.clip(lower=0)
+    down = -1 * delta.clip(upper=0)
+    
+    sum_up = up.rolling(window=period).sum()
+    sum_down = down.rolling(window=period).sum()
+    
+    cmo = 100 * (sum_up - sum_down) / (sum_up + sum_down)
+    return cmo
+
+def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """Calculates Average True Range (ATR)."""
+    high_low = df['High'] - df['Low']
+    high_close = (df['High'] - df['Close'].shift(1)).abs()
+    low_close = (df['Low'] - df['Close'].shift(1)).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    return tr.rolling(window=period).mean()
+
+def calculate_chande_kroll_stop(df: pd.DataFrame, p: int = 10, x: float = 2.0, m: int = 14):
+    """Calculates Chande Kroll Long and Short Trailing Stops."""
+    atr = calculate_atr(df, period=p)
+    long_stop_prelim = df['High'].rolling(window=p).max() - (x * atr)
+    short_stop_prelim = df['Low'].rolling(window=p).min() + (x * atr)
+    
+    long_stop = long_stop_prelim.rolling(window=m).max()
+    short_stop = short_stop_prelim.rolling(window=m).min()
+    return long_stop, short_stop
+
+# ------------------------------------------------------------------
+# 2. BACKTEST ENGINE
+# ------------------------------------------------------------------
+def run_chande_backtest(
+    df: pd.DataFrame, 
+    cmo_period: int = 14, 
+    cmo_buy_level: float = 0.0,
+    risk_per_trade: float = 0.02, 
+    initial_capital: float = 100000.0,
+    commission_pct: float = 0.001
+) -> pd.DataFrame:
+    """
+    Backtests a basic CMO Entry + Chande Kroll Trailing Stop System
+    with Fixed Fractional Volatility-Based Position Sizing.
+    """
+    data = df.copy()
+    data['CMO'] = calculate_cmo(data['Close'], period=cmo_period)
+    data['ATR'] = calculate_atr(data, period=14)
+    data['Long_Stop'], data['Short_Stop'] = calculate_chande_kroll_stop(data)
+    
+    capital = initial_capital
+    position = 0 # Shares held
+    entry_price = 0.0
+    
+    equity_curve = []
+    trades = []
+
+    for i in range(len(data)):
+        if i < cmo_period + 14:
+            equity_curve.append(capital)
+            continue
+            
+        date = data.index[i]
+        price = data['Close'].iloc[i]
+        cmo_val = data['CMO'].iloc[i]
+        cmo_prev = data['CMO'].iloc[i-1]
+        long_stop = data['Long_Stop'].iloc[i]
+        atr = data['ATR'].iloc[i]
+
+        # Check Exit Signal (Price closes below Chande Kroll Stop)
+        if position > 0 and price < long_stop:
+            exit_price = price * (1 - commission_pct)
+            pnl = position * (exit_price - entry_price)
+            capital += pnl
+            trades.append({'Date': date, 'Type': 'EXIT', 'Price': exit_price, 'PnL': pnl, 'Capital': capital})
+            position = 0
+            entry_price = 0.0
+
+        # Check Entry Signal (CMO crosses above buy level)
+        if position == 0 and cmo_prev < cmo_buy_level <= cmo_val:
+            entry_price = price * (1 + commission_pct)
+            # Position Sizing based on Chande's Risk Allocation:
+            # Dollar Risk = Capital * Risk Percentage
+            # Shares = Dollar Risk / Stop Distance (or Volatility ATR)
+            stop_distance = max(entry_price - long_stop, atr * 1.5)
+            dollar_risk = capital * risk_per_trade
+            position = int(dollar_risk / stop_distance)
+            
+            # Cap position by available capital
+            position = min(position, int(capital / entry_price))
+            
+            if position > 0:
+                trades.append({'Date': date, 'Type': 'ENTRY', 'Price': entry_price, 'Position': position})
+
+        # Calculate current equity
+        current_equity = capital + (position * (price - entry_price) if position > 0 else 0)
+        equity_curve.append(current_equity)
+
+    data['Equity'] = equity_curve
+    return data, pd.DataFrame(trades)
+
+# ------------------------------------------------------------------
+# 3. PERFORMANCE METRICS
+# ------------------------------------------------------------------
+def print_system_metrics(results: pd.DataFrame, trades: pd.DataFrame):
+    """Prints Chande's key system evaluation metrics."""
+    equity = results['Equity']
+    returns = equity.pct_change().dropna()
+    
+    total_return = (equity.iloc[-1] - equity.iloc[0]) / equity.iloc[0] * 100
+    cum_max = equity.cummax()
+    drawdown = (equity - cum_max) / cum_max
+    max_dd = drawdown.min() * 100
+    
+    closed_trades = trades[trades['Type'] == 'EXIT']
+    win_rate = (closed_trades['PnL'] > 0).mean() * 100 if len(closed_trades) > 0 else 0
+    profit_factor = (
+        closed_trades[closed_trades['PnL'] > 0]['PnL'].sum() / 
+        abs(closed_trades[closed_trades['PnL'] < 0]['PnL'].sum())
+    ) if len(closed_trades) > 0 and abs(closed_trades[closed_trades['PnL'] < 0]['PnL'].sum()) > 0 else np.nan
+
+    print("=== SYSTEM PERFORMANCE SUMMARY ===")
+    print(f"Total Return:       {total_return:.2f}%")
+    print(f"Max Drawdown:       {max_dd:.2f}%")
+    print(f"Win Rate:           {win_rate:.2f}%")
+    print(f"Profit Factor:      {profit_factor:.2f}")
+    print(f"Total Trades:       {len(closed_trades)}")
