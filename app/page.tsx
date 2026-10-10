@@ -47,6 +47,7 @@ export default function Home() {
   const [tradeQty, setTradeQty] = useState(10);
 
   // Research Ticker State & Conviction Parameters (x, y, z, V_min, M)
+  const [inputSymbol, setInputSymbol] = useState('');
   const [researchSymbol, setResearchSymbol] = useState('');
   const [paramX, setParamX] = useState(15);
   const [paramVmin, setParamVmin] = useState(1.3);
@@ -379,6 +380,8 @@ export default function Home() {
   };
 
   const fetchResearch = useCallback(async (symbol = researchSymbol) => {
+    const sym = (symbol || '').trim().toUpperCase();
+    if (!sym) return;
     try {
       const queryParams = new URLSearchParams({
         x: paramX.toString(),
@@ -387,7 +390,7 @@ export default function Home() {
         M: paramM.toString(),
         z: paramZ.toString(),
       });
-      const res = await fetch(`/api/research/${symbol}?${queryParams}`);
+      const res = await fetch(`/api/research/${sym}?${queryParams}`);
       if (res.ok) {
         const data = await res.json();
         setResearchData(data);
@@ -397,6 +400,15 @@ export default function Home() {
     }
   }, [researchSymbol, paramX, paramVmin, paramY, paramM, paramZ]);
 
+  const handleGoResearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const sym = inputSymbol.trim().toUpperCase();
+    if (sym) {
+      setResearchSymbol(sym);
+      fetchResearch(sym);
+    }
+  };
+
   // Real-time Auto Refresh when ANY parameter or symbol changes!
   useEffect(() => {
     fetchPortfolio();
@@ -405,9 +417,12 @@ export default function Home() {
     runMiner('NVDA');
   }, [fetchSavedDatasets]);
 
+  // Recalculate conviction detector ONLY when slider parameters change for an ALREADY confirmed research symbol
   useEffect(() => {
-    fetchResearch(researchSymbol);
-  }, [fetchResearch, researchSymbol]);
+    if (researchSymbol && researchSymbol.trim()) {
+      fetchResearch(researchSymbol);
+    }
+  }, [paramX, paramVmin, paramY, paramM, paramZ]);
 
   const fetchStrategies = async () => {
     try {
@@ -855,18 +870,13 @@ export default function Home() {
               </div>
 
               <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (researchSymbol.trim()) {
-                    fetchResearch(researchSymbol.trim().toUpperCase());
-                  }
-                }}
+                onSubmit={handleGoResearch}
                 className="flex items-center gap-3 w-full md:w-auto"
               >
                 <input
                   type="text"
-                  value={researchSymbol}
-                  onChange={(e) => setResearchSymbol(e.target.value.toUpperCase())}
+                  value={inputSymbol}
+                  onChange={(e) => setInputSymbol(e.target.value.toUpperCase())}
                   placeholder="TICKER (e.g. NVDA)"
                   className="bg-background border border-border rounded-lg px-4 py-2 font-bold uppercase text-lg text-foreground w-48 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-muted/50 placeholder:text-xs"
                 />
@@ -1163,6 +1173,7 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => {
+                                setInputSymbol(ds.symbol);
                                 setResearchSymbol(ds.symbol);
                                 setActiveTab('research');
                                 fetchIntraday15m(ds.symbol, ds.startDate, ds.endDate);
