@@ -7,6 +7,7 @@ const inMemoryDatasets: Map<string, any> = new Map();
 function sanitizeForJSON(obj: any): any {
   if (obj === null || obj === undefined) return null;
   if (typeof obj === 'bigint') return Number(obj);
+  if (obj instanceof Date) return obj.toISOString();
   if (typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(sanitizeForJSON);
   const result: Record<string, any> = {};
@@ -14,6 +15,8 @@ function sanitizeForJSON(obj: any): any {
     const val = obj[key];
     if (typeof val === 'bigint') {
       result[key] = Number(val);
+    } else if (val instanceof Date) {
+      result[key] = val.toISOString();
     } else if (typeof val === 'object' && val !== null) {
       result[key] = sanitizeForJSON(val);
     } else if (val !== undefined) {

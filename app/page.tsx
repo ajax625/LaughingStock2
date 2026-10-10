@@ -220,6 +220,7 @@ export default function Home() {
       }
 
       if (res.ok && resData.dataset) {
+        saveLocalDataset(resData.dataset);
         setToastMessage(`✨ Approved! Dataset '${dsName}' saved to DB & Phase 2 Analysis.`);
       } else {
         saveLocalDataset(fallbackDs);
@@ -260,7 +261,11 @@ export default function Home() {
         map.set(d.datasetName, d);
       }
     }
-    setSavedDatasets(Array.from(map.values()));
+    const combined = Array.from(map.values());
+    try {
+      localStorage.setItem('ls_saved_datasets', JSON.stringify(combined));
+    } catch (e) {}
+    setSavedDatasets(combined);
   }, []);
 
   const attachRangeToCandidate = async (candDate: string, candObj?: any) => {
@@ -342,20 +347,58 @@ export default function Home() {
         }
 
         // 1. Save Named Research Dataset in DB (e.g. AAPL_09102026_5_2)
-        const dsRes = await fetch('/api/research/datasets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            symbol: researchSymbol,
-            convictionDate: candDate,
-            roiPct: roi,
-            startDate: range.startDate,
-            endDate: range.endDate,
-            candles: candlesToSave,
-          }),
-        });
+        let mmddyyyy = '00000000';
+        try {
+          const cleanDate = String(candDate).split('T')[0].split(' ')[0].trim();
+          const parts = cleanDate.includes('-') ? cleanDate.split('-') : cleanDate.split('/');
+          if (parts.length === 3) {
+            mmddyyyy = parts[0].length === 4 ? `${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}${parts[0]}` : `${parts[0].padStart(2, '0')}${parts[1].padStart(2, '0')}${parts[2]}`;
+          } else {
+            mmddyyyy = cleanDate.replace(/\D/g, '').padStart(8, '0');
+          }
+        } catch (e) {}
 
-        if (dsRes.ok) savedCount++;
+        const dsName = `${researchSymbol}_${mmddyyyy}_${Number(roi).toFixed(1).replace('.', '_')}`;
+        const fallbackDs = {
+          id: `local-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          datasetName: dsName,
+          symbol: researchSymbol,
+          convictionDate: candDate,
+          roiPct: Number(roi),
+          startDate: range.startDate,
+          endDate: range.endDate,
+          barCount: candlesToSave.length,
+          status: 'APPROVED_FOR_RESEARCH',
+          candles: candlesToSave,
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          const dsRes = await fetch('/api/research/datasets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol: researchSymbol,
+              convictionDate: candDate,
+              roiPct: roi,
+              startDate: range.startDate,
+              endDate: range.endDate,
+              candles: candlesToSave,
+            }),
+          });
+
+          if (dsRes.ok) {
+            const dsJson = await dsRes.json().catch(() => ({}));
+            saveLocalDataset(dsJson.dataset || fallbackDs);
+            savedCount++;
+          } else {
+            saveLocalDataset(fallbackDs);
+            savedCount++;
+          }
+        } catch (err) {
+          saveLocalDataset(fallbackDs);
+          savedCount++;
+        }
 
         // 2. Queue into Strategy Engine
         await fetch('/api/strategies', {
@@ -1191,7 +1234,7 @@ export default function Home() {
                   </thead>
                   <tbody className="divide-y divide-border font-medium">
                     {savedDatasets.map((ds: any) => (
-                      <tr key={ds.id} className="hover:bg-background/50 transition">
+                      <tr key={ds.id || ds.datasetName} className="hover:bg-background/50 transition">
                         <td className="py-3 font-mono font-bold text-amber-400">
                           <span className="bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded text-xs">
                             {ds.datasetName}
@@ -1199,7 +1242,7 @@ export default function Home() {
                         </td>
                         <td className="font-bold">{ds.symbol}</td>
                         <td className="text-xs text-muted">{ds.convictionDate}</td>
-                        <td className="text-purple-400 font-bold">{ds.roiPct.toFixed(1)}%</td>
+                        <td className="text-purple-400 font-bold">{Number(ds.roiPct || 0).toFixed(1)}%</td>
                         <td className="text-xs font-mono">{ds.startDate} → {ds.endDate}</td>
                         <td className="text-xs text-cyan-400 font-bold">
                           {ds._count?.marketCandles !== undefined ? ds._count.marketCandles : (ds.barCount || 0)} 5m bars (Linked FK)
