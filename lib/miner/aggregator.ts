@@ -57,3 +57,31 @@ export function aggregateCandles(candles: Candle[], interval: HarvestTimeframe):
 
   return result;
 }
+
+/**
+ * Format any date or timestamp into US Eastern Time (America/New_York - EST/EDT)
+ * Returns string in format: YYYY-MM-DD HH:mm
+ */
+export function formatToET(dateInput: string | Date | number): string {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(d);
+  const map: Record<string, string> = {};
+  for (const p of parts) {
+    map[p.type] = p.value;
+  }
+
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`;
+}

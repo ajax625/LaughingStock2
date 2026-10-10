@@ -1,5 +1,6 @@
 import YahooFinance from 'yahoo-finance2';
 import { prisma } from './prisma';
+import { formatToET } from './miner/aggregator';
 
 // Instantiate YahooFinance v3 with notice suppression
 const yahooFinance = new YahooFinance({
@@ -87,6 +88,47 @@ export function aggregateCandles(candles: Candle[], interval: HarvestTimeframe):
   }
 
   return result;
+}
+
+export interface AlpacaClock {
+  timestamp: string;
+  is_open: boolean;
+  next_open: string;
+  next_close: string;
+}
+
+/**
+ * Alpaca Markets Clock API (/v2/clock)
+ * Queries real-time market open/close status, next open, and next close
+ */
+export async function getAlpacaClock(): Promise<AlpacaClock | null> {
+  const apiKey = process.env.ALPACA_API_KEY;
+  const secretKey = process.env.ALPACA_SECRET_KEY;
+  if (!apiKey || !secretKey) return null;
+
+  try {
+    const baseUrl = process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2';
+    const url = `${baseUrl}/clock`;
+    const res = await fetch(url, {
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secretKey,
+      },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      timestamp: data.timestamp,
+      is_open: data.is_open === true,
+      next_open: data.next_open,
+      next_close: data.next_close,
+    };
+  } catch (e) {
+    console.warn('[Alpaca Clock] API fetch failed, using fallback ET schedule math:', e);
+    return null;
+  }
 }
 
 /**
@@ -354,8 +396,8 @@ function parseAlpacaBars(bars: any[], interval: CandleInterval, sym: string): Ca
 
   return bars.map((b) => ({
     date: interval === '1d' 
-      ? new Date(b.t).toISOString().split('T')[0]
-      : new Date(b.t).toISOString().replace('T', ' ').slice(0, 16),
+      ? formatToET(b.t).split(' ')[0]
+      : formatToET(b.t),
     open: Number(b.o.toFixed(2)),
     high: Number(b.h.toFixed(2)),
     low: Number(b.l.toFixed(2)),

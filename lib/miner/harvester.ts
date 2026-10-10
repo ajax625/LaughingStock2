@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import { getStockCandles } from '@/lib/market-data';
+import { getStockCandles, getAlpacaClock } from '@/lib/market-data';
 
 /**
- * Get date parts in target timezone (default PST / America/Los_Angeles)
+ * Get date parts in target timezone (default ET / America/New_York)
  */
-export function getZonedParts(date: Date = new Date(), timeZone: string = 'America/Los_Angeles') {
+export function getZonedParts(date: Date = new Date(), timeZone: string = 'America/New_York') {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone,
     weekday: 'short',
@@ -36,74 +36,73 @@ export function getZonedParts(date: Date = new Date(), timeZone: string = 'Ameri
 }
 
 /**
- * Off-Market Hours Validator (Timezone Aware - PST)
- * Active Windows:
- * 1. Mon-Fri 15:00 - 23:59 PST (3:00 PM to Midnight)
- * 2. Mon-Fri 00:00 - 05:59 PST (Midnight to 6:00 AM)
- * 3. Sat & Sun PST (All Day 24h)
- * 
- * Regular Market Hours Inactive Window: Mon-Fri 06:00 - 14:59 PST (6:00 AM to 3:00 PM)
+ * Off-Market Hours Validator
+ * Queries Alpaca Clock API (/v2/clock) for official market open/close status.
+ * Fallback: Mon-Fri 9:30 AM - 4:00 PM ET = regular market hours (standby).
  */
-export function isOffMarketHours(date: Date = new Date(), timeZone: string = 'America/Los_Angeles'): boolean {
-  const { day, hour } = getZonedParts(date, timeZone);
+export async function isOffMarketHours(date: Date = new Date(), timeZone: string = 'America/New_York'): Promise<boolean> {
+  try {
+    const clock = await getAlpacaClock();
+    if (clock && typeof clock.is_open === 'boolean') {
+      return !clock.is_open;
+    }
+  } catch (e) {
+    console.warn('[Harvester] Alpaca clock API query error, using ET fallback math:', e);
+  }
 
-  // Weekends: Saturday (6) and Sunday (0) are ALL DAY off-market
+  const { day, hour, minute } = getZonedParts(date, timeZone);
+
+  // Sat & Sun: All day off-market
   if (day === 0 || day === 6) {
     return true;
   }
 
-  // Mon-Fri: Off-market from 3:00 PM (15:00) to Midnight (23:59) AND Midnight to 6:00 AM (05:59) PST
-  if (hour >= 15 || hour < 6) {
-    return true;
-  }
-
-  // Mon-Fri 6:00 AM to 3:00 PM PST is regular market hours
-  return false;
+  // Regular Market Hours in ET: Mon-Fri 9:30 AM to 4:00 PM ET
+  const isMarketOpen = (hour > 9 || (hour === 9 && minute >= 30)) && hour < 16;
+  return !isMarketOpen;
 }
 
-export function getNextCronRunTime(currentDate: Date = new Date(), timeZone: string = 'America/Los_Angeles') {
+export async function getNextCronRunTime(currentDate: Date = new Date(), timeZone: string = 'America/New_York') {
   const now = new Date(currentDate);
-  const { minute } = getZonedParts(now, timeZone);
 
-  // Calculate next 15-minute slot boundary
+  try {
+    const clock = await getAlpacaClock();
+    if (clock) {
+      const nextOpenDate = new Date(clock.next_open);
+      const timeStr = nextOpenDate.toLocaleTimeString('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZoneName: 'short',
+      });
+      const dateStr = nextOpenDate.toLocaleDateString('en-US', {
+        timeZone,
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      return {
+        nextRun: clock.next_open,
+        isOffMarketNow: !clock.is_open,
+        formatted: `${timeStr} (${dateStr})`,
+      };
+    }
+  } catch (e) {}
+
+  const { minute } = getZonedParts(now, timeZone);
   const nextMinSlot = Math.ceil((minute + 0.1) / 15) * 15;
   const candidate = new Date(now.getTime() + (nextMinSlot - minute) * 60 * 1000);
 
-  // Check if candidate slot is in an active off-market window in target timezone
-  if (isOffMarketHours(candidate, timeZone)) {
-    const timeStr = candidate.toLocaleTimeString('en-US', {
-      timeZone,
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZoneName: 'short',
-    });
-    const dateStr = candidate.toLocaleDateString('en-US', {
-      timeZone,
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-
-    return {
-      nextRun: candidate.toISOString(),
-      isOffMarketNow: isOffMarketHours(now, timeZone),
-      formatted: `${timeStr} (${dateStr})`,
-    };
-  }
-
-  // If candidate falls in regular market hours (Mon-Fri 6am - 3pm PST), next off-market run starts at 3:00 PM today PST
-  const { hour } = getZonedParts(now, timeZone);
-  const afternoonRun = new Date(now.getTime() + (15 - hour) * 60 * 60 * 1000);
-
-  const timeStr = afternoonRun.toLocaleTimeString('en-US', {
+  const timeStr = candidate.toLocaleTimeString('en-US', {
     timeZone,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
     timeZoneName: 'short',
   });
-  const dateStr = afternoonRun.toLocaleDateString('en-US', {
+  const dateStr = candidate.toLocaleDateString('en-US', {
     timeZone,
     weekday: 'short',
     month: 'short',
@@ -111,8 +110,8 @@ export function getNextCronRunTime(currentDate: Date = new Date(), timeZone: str
   });
 
   return {
-    nextRun: afternoonRun.toISOString(),
-    isOffMarketNow: isOffMarketHours(now, timeZone),
+    nextRun: candidate.toISOString(),
+    isOffMarketNow: true,
     formatted: `${timeStr} (${dateStr})`,
   };
 }
@@ -125,14 +124,14 @@ export interface HarvestOptions {
 export async function processPhase2Harvesting(options: HarvestOptions = {}) {
   const { force = false, datasetId } = options;
   const now = new Date();
-  const offMarket = isOffMarketHours(now);
-  const nextSchedule = getNextCronRunTime(now);
+  const offMarket = await isOffMarketHours(now);
+  const nextSchedule = await getNextCronRunTime(now);
 
   if (!offMarket && !force) {
     return {
       success: true,
       skipped: true,
-      reason: 'Regular market hours active (Mon-Fri 6:00 AM - 3:00 PM PST). Off-market 5m harvester on standby.',
+      reason: 'Regular market hours active (Mon-Fri 9:30 AM - 4:00 PM ET). Off-market 5m harvester on standby.',
       timestamp: now.toISOString(),
       offMarketHours: false,
       nextCronRun: nextSchedule,

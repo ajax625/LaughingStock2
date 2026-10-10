@@ -99,7 +99,7 @@ export default function Home() {
   useEffect(() => {
     const calcNextRun = () => {
       const now = new Date();
-      const timeZone = 'America/Los_Angeles';
+      const timeZone = 'America/New_York';
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
         weekday: 'short',
@@ -120,7 +120,10 @@ export default function Home() {
       const minute = parseInt(partMap.minute || '0', 10);
       const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
       const day = dayMap[partMap.weekday || ''] ?? now.getDay();
-      const isOffMarket = (day === 0 || day === 6) || (hour >= 15 || hour < 6);
+      
+      // Regular Market Hours in ET: Mon-Fri 9:30 AM to 4:00 PM ET
+      const isMarketOpen = day >= 1 && day <= 5 && (hour > 9 || (hour === 9 && minute >= 30)) && hour < 16;
+      const isOffMarket = !isMarketOpen;
 
       const nextMinSlot = Math.ceil((minute + 0.1) / 15) * 15;
       const candidate = new Date(now.getTime() + (nextMinSlot - minute) * 60 * 1000);
@@ -141,14 +144,14 @@ export default function Home() {
         });
         setNextHarvesterRun(`${timeStr} (${dateStr})`);
       } else {
-        const afternoonRun = new Date(now.getTime() + (15 - hour) * 60 * 60 * 1000);
+        const afternoonRun = new Date(now.getTime() + (16 - hour) * 60 * 60 * 1000);
         const dateStr = afternoonRun.toLocaleDateString('en-US', {
           timeZone,
           weekday: 'short',
           month: 'short',
           day: 'numeric',
         });
-        setNextHarvesterRun(`3:00 PM PST (${dateStr})`);
+        setNextHarvesterRun(`4:00 PM EDT (${dateStr})`);
       }
     };
 
@@ -1293,7 +1296,7 @@ export default function Home() {
                   <Database className="w-5 h-5 text-emerald-400" /> Phase 2: 5m Intraday Harvester ({savedDatasets.length})
                 </h3>
                 <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                  🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
+                  🌙 Off-Market Cron (Alpaca Clock ET): Mon-Fri 4:00 PM - 9:30 AM ET, Sat & Sun All Day (Every 15m)
                 </span>
                 {nextHarvesterRun && (
                   <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">

@@ -410,7 +410,7 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
           <span className="text-muted-foreground font-bold uppercase tracking-wider">Session Inspector:</span>
           {hoverCandle ? (
             <div className="flex items-center gap-3 font-semibold font-mono flex-wrap">
-              <span className="text-foreground">Date: {hoverCandle.date}</span>
+              <span className="text-foreground">Date: {hoverCandle.date}{hoverCandle.date?.includes(' ') ? ' ET' : ''}</span>
               <span className="text-blue-500">Open: ${hoverCandle.open?.toFixed(2)}</span>
               <span className="text-emerald-500">High: ${hoverCandle.high?.toFixed(2)}</span>
               <span className="text-rose-500">Low: ${hoverCandle.low?.toFixed(2)}</span>

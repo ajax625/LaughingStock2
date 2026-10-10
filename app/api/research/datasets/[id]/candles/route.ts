@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getStockCandles } from '@/lib/market-data';
+import { formatToET } from '@/lib/miner/aggregator';
 
 export async function GET(
   req: Request,
@@ -24,7 +25,7 @@ export async function GET(
 
     if (dbCandles.length > 0) {
       const formatted = dbCandles.map((c) => ({
-        date: new Date(c.timestamp).toISOString().replace('T', ' ').slice(0, 16),
+        date: formatToET(c.timestamp),
         open: Number(c.open || 0),
         high: Number(c.high || 0),
         low: Number(c.low || 0),
