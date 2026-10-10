@@ -28,39 +28,6 @@ export function isOffMarketHours(date: Date = new Date()): boolean {
   return false;
 }
 
-export function getNextCronRunTime(currentDate: Date = new Date()) {
-  const now = new Date(currentDate);
-  const minutes = now.getMinutes();
-  
-  // Calculate next 15-minute slot boundary
-  const nextMinSlot = Math.ceil((minutes + 0.1) / 15) * 15;
-  const candidate = new Date(now);
-  candidate.setMinutes(nextMinSlot, 0, 0);
-
-  // Check if candidate slot is in an active off-market window
-  if (isOffMarketHours(candidate)) {
-    return {
-      nextRun: candidate,
-      isOffMarketNow: isOffMarketHours(now),
-      formatted: candidate.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }) + ' (' + candidate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ')',
-    };
-  }
-
-  // If candidate falls in regular market hours (Mon-Fri 6am - 3pm), next off-market run starts at 3:00 PM today
-  const afternoonRun = new Date(now);
-  afternoonRun.setHours(15, 0, 0, 0);
-  
-  return {
-    nextRun: afternoonRun,
-    isOffMarketNow: isOffMarketHours(now),
-    formatted: '3:00 PM (' + afternoonRun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ')',
-  };
-}
-
 export interface HarvestOptions {
   force?: boolean;
   datasetId?: string;
@@ -71,8 +38,6 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
   const now = new Date();
   const offMarket = isOffMarketHours(now);
 
-  const nextSchedule = getNextCronRunTime(now);
-
   if (!offMarket && !force) {
     return {
       success: true,
@@ -80,7 +45,6 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
       reason: 'Regular market hours active (Mon-Fri 6:00 AM - 3:00 PM). Off-market 5m harvester on standby.',
       timestamp: now.toISOString(),
       offMarketHours: false,
-      nextCronRun: nextSchedule,
     };
   }
 
@@ -101,7 +65,6 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
         message: 'No pending research datasets queued for 5m harvesting.',
         timestamp: now.toISOString(),
         offMarketHours: offMarket,
-        nextCronRun: nextSchedule,
       };
     }
 
@@ -172,7 +135,6 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
       processedCount: results.length,
       timestamp: now.toISOString(),
       offMarketHours: offMarket,
-      nextCronRun: nextSchedule,
       results,
     };
   } catch (err: any) {
