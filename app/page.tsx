@@ -62,8 +62,70 @@ export default function Home() {
   const [loadingIntraday15m, setLoadingIntraday15m] = useState(false);
   const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
   const [isHarvesting5m, setIsHarvesting5m] = useState(false);
+  const [nextHarvesterRun, setNextHarvesterRun] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const matchedCandRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const calcNextRun = () => {
+      const now = new Date();
+      const timeZone = 'America/Los_Angeles';
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+      });
+
+      const parts = formatter.formatToParts(now);
+      const partMap: Record<string, string> = {};
+      for (const p of parts) {
+        partMap[p.type] = p.value;
+      }
+      const hour = parseInt(partMap.hour || '0', 10);
+      const minute = parseInt(partMap.minute || '0', 10);
+      const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      const day = dayMap[partMap.weekday || ''] ?? now.getDay();
+      const isOffMarket = (day === 0 || day === 6) || (hour >= 15 || hour < 6);
+
+      const nextMinSlot = Math.ceil((minute + 0.1) / 15) * 15;
+      const candidate = new Date(now.getTime() + (nextMinSlot - minute) * 60 * 1000);
+
+      if (isOffMarket) {
+        const timeStr = candidate.toLocaleTimeString('en-US', {
+          timeZone,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZoneName: 'short',
+        });
+        const dateStr = candidate.toLocaleDateString('en-US', {
+          timeZone,
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+        setNextHarvesterRun(`${timeStr} (${dateStr})`);
+      } else {
+        const afternoonRun = new Date(now.getTime() + (15 - hour) * 60 * 60 * 1000);
+        const dateStr = afternoonRun.toLocaleDateString('en-US', {
+          timeZone,
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+        setNextHarvesterRun(`3:00 PM PST (${dateStr})`);
+      }
+    };
+
+    calcNextRun();
+    const timer = setInterval(calcNextRun, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRun5mHarvester = async (datasetId?: string) => {
     setIsHarvesting5m(true);
@@ -1193,6 +1255,11 @@ export default function Home() {
                   <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                     🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
                   </span>
+                  {nextHarvesterRun && (
+                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      ⏰ Next Scheduled Run: {nextHarvesterRun}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted mt-0.5">
                   Persisted datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) ready for 5m intraday harvesting & foreign-key linkage.
