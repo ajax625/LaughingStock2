@@ -77,7 +77,8 @@ export async function getStockCandles(
   days = 60,
   interval: CandleInterval = '1d',
   customStartDate?: string,
-  customEndDate?: string
+  customEndDate?: string,
+  persistToDb: boolean = false
 ): Promise<Candle[]> {
   const sym = symbol.toUpperCase().trim();
   if (!sym) throw new Error('Symbol is required');
@@ -91,28 +92,30 @@ export async function getStockCandles(
     validCandles = await getYahooCandles(sym, days, interval, customStartDate, customEndDate);
   }
 
-  // Efficient Batch Persistence into PostgreSQL 'MarketCandle' Table (Single SQL Query)
-  try {
-    const records = validCandles.map((c) => ({
-      symbol: sym,
-      interval: interval,
-      timestamp: new Date(c.date),
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-      volume: BigInt(Math.round(c.volume || 0)),
-    }));
+  // Only persist candles to DB when explicitly requested (e.g. on approved research dataset range persistence)
+  if (persistToDb) {
+    try {
+      const records = validCandles.map((c) => ({
+        symbol: sym,
+        interval: interval,
+        timestamp: new Date(c.date),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: BigInt(Math.round(c.volume || 0)),
+      }));
 
-    const res = await prisma.marketCandle.createMany({
-      data: records,
-      skipDuplicates: true,
-    });
-    if (res.count > 0) {
-      console.log(`[DB SUCCESS] Created ${res.count} MarketCandles in PostgreSQL for ${sym} (Provider: ${provider})`);
+      const res = await prisma.marketCandle.createMany({
+        data: records,
+        skipDuplicates: true,
+      });
+      if (res.count > 0) {
+        console.log(`[DB SUCCESS] Created ${res.count} MarketCandles in PostgreSQL for ${sym} (Provider: ${provider})`);
+      }
+    } catch (dbErr: any) {
+      console.error(`[DB ERROR] PostgreSQL MarketCandle bulk insert failed for ${sym}:`, dbErr?.message || dbErr);
     }
-  } catch (dbErr: any) {
-    console.error(`[DB ERROR] PostgreSQL MarketCandle bulk insert failed for ${sym}:`, dbErr?.message || dbErr);
   }
 
   return validCandles;

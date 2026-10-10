@@ -66,7 +66,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { symbol, convictionDate, roiPct, startDate, endDate, candles } = body;
+    const {
+      symbol,
+      convictionDate,
+      roiPct,
+      startDate,
+      endDate,
+      candles,
+      paramX,
+      paramY,
+      paramZ,
+      paramVmin,
+      paramM,
+    } = body;
 
     if (!symbol) {
       return NextResponse.json({ error: 'Missing required symbol' }, { status: 400 });
@@ -95,11 +107,17 @@ export async function POST(req: Request) {
       mmddyyyy = '01012026';
     }
 
-    const roiVal = Number(roiPct) || 5.0;
+    const roiVal = Number(roiPct) || Number(paramM) || 5.0;
     const roiStr = roiVal.toFixed(1).replace('.', '_');
     const datasetName = `${sym}_${mmddyyyy}_${roiStr}`;
     const rawCandles = Array.isArray(candles) ? candles : [];
     const validCandles = sanitizeForJSON(rawCandles);
+
+    const pX = Number(paramX) || 15;
+    const pY = Number(paramY) || 3;
+    const pZ = Number(paramZ) || 20;
+    const pVmin = Number(paramVmin) || 1.3;
+    const pM = Number(paramM) || roiVal;
 
     let dataset: any = null;
 
@@ -113,6 +131,11 @@ export async function POST(req: Request) {
           startDate: effectiveStartDate,
           endDate: effectiveEndDate,
           barCount: validCandles.length,
+          paramX: pX,
+          paramY: pY,
+          paramZ: pZ,
+          paramVmin: pVmin,
+          paramM: pM,
           status: 'APPROVED_FOR_RESEARCH',
           candles: validCandles,
         },
@@ -124,6 +147,11 @@ export async function POST(req: Request) {
           startDate: effectiveStartDate,
           endDate: effectiveEndDate,
           barCount: validCandles.length,
+          paramX: pX,
+          paramY: pY,
+          paramZ: pZ,
+          paramVmin: pVmin,
+          paramM: pM,
           status: 'APPROVED_FOR_RESEARCH',
           candles: validCandles,
         },

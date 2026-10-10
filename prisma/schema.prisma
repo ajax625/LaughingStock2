@@ -115,6 +115,11 @@ model ResearchDataset {
   startDate      String
   endDate        String
   barCount       Int
+  paramX         Int      @default(15)
+  paramY         Int      @default(3)
+  paramZ         Int      @default(20)
+  paramVmin      Float    @default(1.3)
+  paramM         Float    @default(5.0)
   status         String   @default("APPROVED_FOR_RESEARCH")
   candles        Json
   createdAt      DateTime @default(now())

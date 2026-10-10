@@ -47,7 +47,7 @@ export default function Home() {
   const [tradeQty, setTradeQty] = useState(10);
 
   // Research Ticker State & Conviction Parameters (x, y, z, V_min, M)
-  const [researchSymbol, setResearchSymbol] = useState('INTC');
+  const [researchSymbol, setResearchSymbol] = useState('');
   const [paramX, setParamX] = useState(15);
   const [paramVmin, setParamVmin] = useState(1.3);
   const [paramY, setParamY] = useState(3);
@@ -173,6 +173,11 @@ export default function Home() {
           startDate: selectedRange.startDate,
           endDate: selectedRange.endDate,
           candles: [],
+          paramX,
+          paramY,
+          paramZ,
+          paramVmin,
+          paramM,
         }),
       });
 
@@ -849,20 +854,29 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (researchSymbol.trim()) {
+                    fetchResearch(researchSymbol.trim().toUpperCase());
+                  }
+                }}
+                className="flex items-center gap-3 w-full md:w-auto"
+              >
                 <input
                   type="text"
                   value={researchSymbol}
                   onChange={(e) => setResearchSymbol(e.target.value.toUpperCase())}
-                  className="bg-background border border-border rounded-lg px-4 py-2 font-bold uppercase text-lg text-foreground w-32 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="TICKER (e.g. NVDA)"
+                  className="bg-background border border-border rounded-lg px-4 py-2 font-bold uppercase text-lg text-foreground w-48 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-muted/50 placeholder:text-xs"
                 />
                 <button
-                  onClick={() => fetchResearch(researchSymbol)}
-                  className="bg-amber-600 text-black font-bold text-sm px-4 py-2 rounded-lg hover:bg-amber-500 flex items-center gap-1.5 shadow"
+                  type="submit"
+                  className="bg-amber-600 hover:bg-amber-500 text-black font-bold text-sm px-5 py-2.5 rounded-lg flex items-center gap-2 shadow transition cursor-pointer active:scale-95"
                 >
-                  <Sparkles className="w-4 h-4" /> Refresh Ticker
+                  <Sparkles className="w-4 h-4" /> Go
                 </button>
-              </div>
+              </form>
             </div>
 
             {/* Configurable Parameter Control Panel (x, y, z, V_min, M) */}
@@ -1045,23 +1059,41 @@ export default function Home() {
           </div>
 
           {/* Interactive Chart with Conviction Visual Markers & Line Graphs */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-center flex-wrap gap-2">
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <span className="px-3 py-1 bg-amber-500 text-black font-bold rounded flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5" /> Conviction Days Flagged: {researchData?.convictionCount || 0}
-                </span>
-                <span className="px-3 py-1 bg-background border border-border rounded text-muted">
-                  365 Daily Candles Harvested
-                </span>
+          {!researchData ? (
+            <div className="bg-card border border-border rounded-xl p-12 text-center space-y-4 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                <Search className="w-8 h-8" />
               </div>
-              <div className="text-xs text-muted">
-                Rules: RVOL &gt; {paramVmin}x • Range Straddle (Median y={paramY}) • Range% &gt; {paramM}%
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="text-xl font-bold text-foreground">Phase 1: Harvest & Detect Conviction Days</h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  Enter a stock ticker above (e.g., <span className="font-mono text-amber-400 font-bold">NVDA</span>, <span className="font-mono text-amber-400 font-bold">AAPL</span>) and click <span className="font-bold text-amber-400">Go</span> to download 1D daily candles into memory for conviction day detection.
+                </p>
+                <div className="pt-2 text-[11px] text-muted/80 flex items-center justify-center gap-1.5 font-mono">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>100% In-Memory Analysis — Zero database writes until dataset range approval</span>
+                </div>
               </div>
             </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <div className="flex items-center gap-3 text-xs font-semibold">
+                  <span className="px-3 py-1 bg-amber-500 text-black font-bold rounded flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5" /> Conviction Days Flagged: {researchData?.convictionCount || 0}
+                  </span>
+                  <span className="px-3 py-1 bg-background border border-border rounded text-muted">
+                    {researchData?.totalDailyCandles || 365} Daily Candles (In Memory)
+                  </span>
+                </div>
+                <div className="text-xs text-muted">
+                  Rules: RVOL &gt; {paramVmin}x • Range Straddle (Median y={paramY}) • Range% &gt; {paramM}%
+                </div>
+              </div>
 
-            <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} theme={theme} />
-          </div>
+              <StockChart candles={researchData?.candles || []} onRangeSelect={handleRangeSelect} theme={theme} />
+            </div>
+          )}
         </section>
       )}
 
@@ -1072,11 +1104,16 @@ export default function Home() {
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
               <div>
-                <h3 className="font-bold text-md text-emerald-400 flex items-center gap-2">
-                  <FlaskConical className="w-5 h-5 text-emerald-400" /> Approved Research Datasets & Candidates ({savedDatasets.length})
-                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-md text-emerald-400 flex items-center gap-2">
+                    <FlaskConical className="w-5 h-5 text-emerald-400" /> Approved Research Datasets & Candidates ({savedDatasets.length})
+                  </h3>
+                  <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    🌙 Phase 2: Off-Market Hours Processing Queue
+                  </span>
+                </div>
                 <p className="text-xs text-muted mt-0.5">
-                  Named 15m intraday datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) approved for research and persisted to database.
+                  Named 15m intraday datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) persisted from Phase 1 ready for strategy synthesis.
                 </p>
               </div>
               <button

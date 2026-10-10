@@ -24,8 +24,8 @@ export async function GET(
   try {
     const quote = await getStockQuote(symbol);
 
-    // First Pass Harvest: 365 Days of 1D Daily Bars (Saved directly into PostgreSQL MarketCandle table)
-    const rawCandles = await getStockCandles(symbol, 365, '1d');
+    // Download 365 Days of 1D Daily Bars into memory (without saving to DB)
+    const rawCandles = await getStockCandles(symbol, 365, '1d', undefined, undefined, false);
 
     // Query exact database count for this symbol
     let dbCount = 0;
