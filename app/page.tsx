@@ -16,13 +16,18 @@ import {
   UserCheck,
   Sliders,
   Award,
+  Database,
+  Cpu,
+  Activity,
+  BarChart2,
 } from 'lucide-react';
+import { aggregateCandles, HarvestTimeframe } from '@/lib/miner/aggregator';
 
 export default function Home() {
   const { data: session } = useSession();
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'portfolio' | 'research' | 'miner' | 'signals'>('dashboard');
+  // Tab State: Phase 1 (research), Phase 2 (miner/harvester), Phase 3 (analyzer), Phase 4 (signals)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'portfolio' | 'research' | 'miner' | 'analyzer' | 'signals'>('dashboard');
 
   // UI Theme State ('dark' | 'light')
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -65,6 +70,31 @@ export default function Home() {
   const [nextHarvesterRun, setNextHarvesterRun] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const matchedCandRef = useRef<HTMLDivElement | null>(null);
+
+  // Phase 2 Bottom 50% Harvested Candle Chart Viewer State
+  const [selectedHarvestDataset, setSelectedHarvestDataset] = useState<any>(null);
+  const [harvestRawCandles, setHarvestRawCandles] = useState<any[]>([]);
+  const [harvestChartInterval, setHarvestChartInterval] = useState<HarvestTimeframe>('5m');
+  const [loadingHarvestChart, setLoadingHarvestChart] = useState<boolean>(false);
+
+  const fetchHarvestedCandles = async (ds: any) => {
+    setSelectedHarvestDataset(ds);
+    setLoadingHarvestChart(true);
+    try {
+      const res = await fetch(`/api/research/datasets/${ds.id}/candles`);
+      if (res.ok) {
+        const data = await res.json();
+        setHarvestRawCandles(data.candles || []);
+      } else {
+        setHarvestRawCandles(ds.candles || []);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch harvested candles:', e);
+      setHarvestRawCandles(ds.candles || []);
+    } finally {
+      setLoadingHarvestChart(false);
+    }
+  };
 
   useEffect(() => {
     const calcNextRun = () => {
@@ -724,7 +754,7 @@ export default function Home() {
                 : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <Search className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Conviction Detector</span>
+            <Search className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 1: Research Studio</span>
           </button>
           <button
             type="button"
@@ -735,7 +765,18 @@ export default function Home() {
                 : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <FlaskConical className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 2: Analysis</span>
+            <Database className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 2: Harvester</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('analyzer')}
+            className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 transition text-xs font-semibold cursor-pointer relative z-10 ${
+              activeTab === 'analyzer'
+                ? 'bg-emerald-500/15 text-emerald-400 font-extrabold border-l-4 border-emerald-400 shadow-[0_0_12px_rgba(0,255,135,0.15)]'
+                : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
+            }`}
+          >
+            <FlaskConical className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 3: Analyzer</span>
           </button>
           <button
             type="button"
@@ -746,7 +787,7 @@ export default function Home() {
                 : 'text-muted hover:text-foreground hover:bg-emerald-500/5'
             }`}
           >
-            <Radio className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 3: Monitoring</span>
+            <Radio className="w-4 h-4 shrink-0 pointer-events-none text-emerald-400" /> <span className="pointer-events-none">Phase 4: Monitoring</span>
           </button>
         </nav>
 
@@ -1241,38 +1282,33 @@ export default function Home() {
         </section>
       )}
 
-      {/* VIEW 4: PHASE 2 ANALYSIS & STRATEGY ENGINE */}
+      {/* VIEW 4: PHASE 2 HARVESTER (50% TOP GRID / 50% BOTTOM CANDLE CHART) */}
       {activeTab === 'miner' && (
-        <section className="space-y-6">
-          {/* Approved Research Datasets & Potential Candidates Panel */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        <section className="space-y-6 flex flex-col min-h-[calc(100vh-140px)]">
+          {/* TOP 50% PANEL: Approved Research Datasets Grid */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 min-h-[350px]">
             <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-md text-emerald-400 flex items-center gap-2">
-                    <FlaskConical className="w-5 h-5 text-emerald-400" /> Approved Research Datasets & Candidates ({savedDatasets.length})
-                  </h3>
-                  <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-md text-emerald-400 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" /> Phase 2: 5m Intraday Harvester ({savedDatasets.length})
+                </h3>
+                <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                  🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
+                </span>
+                {nextHarvesterRun && (
+                  <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    ⏰ Next Scheduled Run: {nextHarvesterRun}
                   </span>
-                  {nextHarvesterRun && (
-                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      ⏰ Next Scheduled Run: {nextHarvesterRun}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted mt-0.5">
-                  Persisted datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) ready for 5m intraday harvesting & foreign-key linkage.
-                </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleRun5mHarvester()}
                   disabled={isHarvesting5m}
-                  className="text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer disabled:opacity-50"
+                  className="text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer disabled:opacity-50"
                 >
-                  <Sparkles className="w-3.5 h-3.5" /> {isHarvesting5m ? 'Harvesting 5m Bars...' : '⚡ Run 5m Harvester Now'}
+                  <Sparkles className="w-3.5 h-3.5" /> {isHarvesting5m ? 'Harvesting 5m Bars...' : '⚡ Run Harvester Now'}
                 </button>
                 <button
                   type="button"
@@ -1285,9 +1321,9 @@ export default function Home() {
             </div>
 
             {savedDatasets.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-muted border-b border-border uppercase">
+                  <thead className="text-xs text-muted border-b border-border uppercase sticky top-0 bg-card z-10">
                     <tr>
                       <th className="pb-3">Dataset Name</th>
                       <th className="pb-3">Symbol</th>
@@ -1300,76 +1336,72 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border font-medium">
-                    {savedDatasets.map((ds: any) => (
-                      <tr key={ds.id || ds.datasetName} className="hover:bg-background/50 transition">
-                        <td className="py-3 font-mono font-bold text-amber-400">
-                          <span className="bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded text-xs">
-                            {ds.datasetName}
-                          </span>
-                        </td>
-                        <td className="font-bold">{ds.symbol}</td>
-                        <td className="text-xs text-muted">{ds.convictionDate}</td>
-                        <td className="text-purple-400 font-bold">{Number(ds.roiPct || 0).toFixed(1)}%</td>
-                        <td className="text-xs font-mono">{ds.startDate} → {ds.endDate}</td>
-                        <td className="text-xs text-cyan-400 font-bold">
-                          {ds._count?.marketCandles !== undefined ? ds._count.marketCandles : (ds.barCount || 0)} 5m bars (Linked FK)
-                        </td>
-                        <td>
-                          {ds.status === 'HARVESTED_5M' ? (
-                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
-                              🟢 HARVESTED_5M
+                    {savedDatasets.map((ds: any) => {
+                      const isSelected = selectedHarvestDataset?.id === ds.id || selectedHarvestDataset?.datasetName === ds.datasetName;
+                      return (
+                        <tr key={ds.id || ds.datasetName} className={`transition ${isSelected ? 'bg-cyan-500/10 border-l-4 border-cyan-400' : 'hover:bg-background/50'}`}>
+                          <td className="py-3 font-mono font-bold text-amber-400">
+                            <span className="bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded text-xs">
+                              {ds.datasetName}
                             </span>
-                          ) : (
-                            <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
-                              ⏳ PENDING_5M_HARVEST
-                            </span>
-                          )}
-                        </td>
-                        <td className="text-right py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setInputSymbol(ds.symbol);
-                                setResearchSymbol(ds.symbol);
-                                setActiveTab('research');
-                                fetchIntraday15m(ds.symbol, ds.startDate, ds.endDate);
-                              }}
-                              className="text-xs bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-2.5 py-1 rounded font-semibold hover:bg-cyan-600/30 cursor-pointer"
-                            >
-                              Inspect 15m Bars
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMinerSymbol(ds.symbol);
-                                runMiner(ds.symbol);
-                              }}
-                              className="text-xs bg-purple-600 text-white px-2.5 py-1 rounded font-semibold hover:bg-purple-700 shadow cursor-pointer"
-                            >
-                              Mine Fingerprint →
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (confirm(`Delete dataset ${ds.datasetName}?`)) {
-                                  try {
-                                    const local = getLocalDatasets().filter((d: any) => d.id !== ds.id && d.datasetName !== ds.datasetName);
-                                    localStorage.setItem('ls_saved_datasets', JSON.stringify(local));
-                                  } catch (e) {}
-                                  await fetch(`/api/research/datasets?id=${ds.id}`, { method: 'DELETE' }).catch(() => {});
-                                  fetchSavedDatasets();
-                                }
-                              }}
-                              className="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-2 py-1 rounded border border-rose-500/30 cursor-pointer"
-                              title="Delete Dataset"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="font-bold">{ds.symbol}</td>
+                          <td className="text-xs text-muted">{ds.convictionDate}</td>
+                          <td className="text-purple-400 font-bold">{Number(ds.roiPct || 0).toFixed(1)}%</td>
+                          <td className="text-xs font-mono">{ds.startDate} → {ds.endDate}</td>
+                          <td className="text-xs text-cyan-400 font-bold">
+                            {ds._count?.marketCandles !== undefined ? ds._count.marketCandles : (ds.barCount || 0)} 5m bars (Linked FK)
+                          </td>
+                          <td>
+                            {ds.status === 'HARVESTED_5M' ? (
+                              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
+                                🟢 HARVESTED_5M
+                              </span>
+                            ) : (
+                              <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
+                                ⏳ PENDING_5M_HARVEST
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-right py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => fetchHarvestedCandles(ds)}
+                                className={`text-xs px-2.5 py-1 rounded font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                                  isSelected
+                                    ? 'bg-cyan-500 text-black font-extrabold border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
+                                    : 'bg-cyan-600/20 text-cyan-400 border-cyan-500/30 hover:bg-cyan-600/30'
+                                }`}
+                              >
+                                <BarChart2 className="w-3.5 h-3.5" /> View Harvested Data
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (confirm(`Delete dataset ${ds.datasetName}?`)) {
+                                    try {
+                                      const local = getLocalDatasets().filter((d: any) => d.id !== ds.id && d.datasetName !== ds.datasetName);
+                                      localStorage.setItem('ls_saved_datasets', JSON.stringify(local));
+                                    } catch (e) {}
+                                    await fetch(`/api/research/datasets?id=${ds.id}`, { method: 'DELETE' }).catch(() => {});
+                                    if (selectedHarvestDataset?.id === ds.id) {
+                                      setSelectedHarvestDataset(null);
+                                      setHarvestRawCandles([]);
+                                    }
+                                    fetchSavedDatasets();
+                                  }
+                                }}
+                                className="text-xs bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-2 py-1 rounded border border-rose-500/30 cursor-pointer"
+                                title="Delete Dataset"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1380,11 +1412,72 @@ export default function Home() {
             )}
           </div>
 
+          {/* BOTTOM 50% PANEL: Harvested Intraday Candle Chart Viewer & Timeframe Aggregator */}
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 flex-1">
+            {selectedHarvestDataset ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center flex-wrap gap-3 border-b border-border pb-3">
+                  <div>
+                    <h3 className="font-bold text-md text-foreground flex items-center gap-2">
+                      <BarChart2 className="w-5 h-5 text-cyan-400" /> Harvested Candle Dataset: <span className="font-mono text-amber-400">{selectedHarvestDataset.datasetName}</span>
+                    </h3>
+                    <p className="text-xs text-muted mt-0.5 font-mono">
+                      Symbol: <strong className="text-foreground">{selectedHarvestDataset.symbol}</strong> • Date Range: <strong className="text-cyan-400">{selectedHarvestDataset.startDate} → {selectedHarvestDataset.endDate}</strong> • Base 5m Bars: <strong className="text-purple-400">{harvestRawCandles.length}</strong>
+                    </p>
+                  </div>
+
+                  {/* Timeframe Aggregation Increment Selector Buttons */}
+                  <div className="flex items-center gap-1.5 bg-background border border-border rounded-lg p-1">
+                    <span className="text-xs text-muted px-2 font-semibold">Timeframe:</span>
+                    {(['5m', '1h', '2h', '4h', '1d', '10d'] as HarvestTimeframe[]).map((tf) => (
+                      <button
+                        key={tf}
+                        type="button"
+                        onClick={() => setHarvestChartInterval(tf)}
+                        className={`text-xs px-2.5 py-1 rounded font-bold transition cursor-pointer ${
+                          harvestChartInterval === tf
+                            ? 'bg-cyan-500 text-black shadow-sm'
+                            : 'text-muted hover:text-foreground hover:bg-card'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {loadingHarvestChart ? (
+                  <div className="p-12 text-center text-muted text-xs font-mono animate-pulse">
+                    Loading foreign-key linked 5m harvested market candles...
+                  </div>
+                ) : (
+                  <StockChart
+                    candles={aggregateCandles(harvestRawCandles, harvestChartInterval)}
+                    theme={theme}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="p-16 text-center space-y-2">
+                <BarChart2 className="w-10 h-10 text-cyan-400/50 mx-auto" />
+                <h4 className="font-bold text-sm text-foreground">No Dataset Selected for Intraday Inspection</h4>
+                <p className="text-xs text-muted max-w-md mx-auto">
+                  Click <span className="text-cyan-400 font-semibold font-mono">"📊 View Harvested Data"</span> on any row in the top grid above to display its foreign-key linked 5m harvested candles and switch timeframe increments (<span className="font-mono text-amber-400">5m, 1h, 2h, 4h, 1d, 10d</span>).
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* VIEW 5: PHASE 3 ANALYSIS & STRATEGY FORMALIZATION */}
+      {activeTab === 'analyzer' && (
+        <section className="space-y-6">
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <FlaskConical className="w-6 h-6 text-purple-400" /> Phase 2: Analysis & Strategy Formalization
+                  <FlaskConical className="w-6 h-6 text-purple-400" /> Phase 3: Analysis & Strategy Formalization
                 </h2>
                 <p className="text-xs text-muted mt-1">
                   Analyzes pre-move technical fingerprints, constructs JEV prompts, and outputs Typeface.ai JEV action scores.
