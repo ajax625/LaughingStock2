@@ -58,12 +58,45 @@ export default function Home() {
 
   // 15m Intraday Range Selection & Phase 2 5m Harvester State
   const [selectedRange, setSelectedRange] = useState<{ startDate: string; endDate: string; candleCount: number } | null>(null);
+  const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
   const [intraday15mResult, setIntraday15mResult] = useState<any>(null);
   const [loadingIntraday15m, setLoadingIntraday15m] = useState(false);
-  const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
   const [isHarvesting5m, setIsHarvesting5m] = useState(false);
+  const [nextHarvesterRun, setNextHarvesterRun] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const matchedCandRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const calcNextRun = () => {
+      const now = new Date();
+      const day = now.getDay();
+      const hour = now.getHours();
+      const minutes = now.getMinutes();
+
+      const nextMinSlot = Math.ceil((minutes + 0.1) / 15) * 15;
+      const candidate = new Date(now);
+      candidate.setMinutes(nextMinSlot, 0, 0);
+
+      const candidateDay = candidate.getDay();
+      const candidateHour = candidate.getHours();
+      const candidateOffMarket = (candidateDay === 0 || candidateDay === 6) || (candidateHour >= 15 || candidateHour < 6);
+
+      if (candidateOffMarket) {
+        const timeStr = candidate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const dateStr = candidate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        setNextHarvesterRun(`${timeStr} (${dateStr})`);
+      } else {
+        const afternoonRun = new Date(now);
+        afternoonRun.setHours(15, 0, 0, 0);
+        const dateStr = afternoonRun.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        setNextHarvesterRun(`3:00 PM (${dateStr})`);
+      }
+    };
+
+    calcNextRun();
+    const timer = setInterval(calcNextRun, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRun5mHarvester = async (datasetId?: string) => {
     setIsHarvesting5m(true);
@@ -1150,6 +1183,11 @@ export default function Home() {
                   <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                     🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
                   </span>
+                  {nextHarvesterRun && (
+                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      ⏰ Next Scheduled Run: {nextHarvesterRun}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted mt-0.5">
                   Persisted datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) ready for 5m intraday harvesting & foreign-key linkage.
