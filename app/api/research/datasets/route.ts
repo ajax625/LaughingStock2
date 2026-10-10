@@ -33,6 +33,11 @@ export async function GET(req: Request) {
       dbDatasets = await prisma.researchDataset.findMany({
         where: symbol ? { symbol } : undefined,
         orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { marketCandles: true },
+          },
+        },
       });
     } catch (dbErr) {
       console.warn('[DB GET DATASETS WARN] Database query failed, using in-memory store:', dbErr);

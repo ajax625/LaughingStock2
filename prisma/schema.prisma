@@ -91,38 +91,42 @@ model Signal {
 }
 
 model MarketCandle {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
+  datasetId String?
+  dataset   ResearchDataset? @relation(fields: [datasetId], references: [id], onDelete: Cascade)
   symbol    String
-  interval  String   @default("1d")
+  interval  String           @default("1d")
   timestamp DateTime
   open      Float
   high      Float
   low       Float
   close     Float
   volume    BigInt
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
-  @@unique([symbol, interval, timestamp])
+  @@unique([symbol, interval, timestamp, datasetId])
   @@index([symbol, timestamp])
+  @@index([datasetId])
 }
 
 model ResearchDataset {
-  id             String   @id @default(cuid())
-  datasetName    String   @unique
+  id             String         @id @default(cuid())
+  datasetName    String         @unique
   symbol         String
   convictionDate String
   roiPct         Float
   startDate      String
   endDate        String
   barCount       Int
-  paramX         Int      @default(15)
-  paramY         Int      @default(3)
-  paramZ         Int      @default(20)
-  paramVmin      Float    @default(1.3)
-  paramM         Float    @default(5.0)
-  status         String   @default("APPROVED_FOR_RESEARCH")
+  paramX         Int            @default(15)
+  paramY         Int            @default(3)
+  paramZ         Int            @default(20)
+  paramVmin      Float          @default(1.3)
+  paramM         Float          @default(5.0)
+  status         String         @default("APPROVED_FOR_RESEARCH")
   candles        Json
-  createdAt      DateTime @default(now())
+  marketCandles  MarketCandle[]
+  createdAt      DateTime       @default(now())
 
   @@index([symbol])
 }

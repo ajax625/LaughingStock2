@@ -56,13 +56,42 @@ export default function Home() {
   const [paramZ, setParamZ] = useState(20);
   const [researchData, setResearchData] = useState<any>(null);
 
-  // 15m Intraday Range Selection State
+  // 15m Intraday Range Selection & Phase 2 5m Harvester State
   const [selectedRange, setSelectedRange] = useState<{ startDate: string; endDate: string; candleCount: number } | null>(null);
   const [intraday15mResult, setIntraday15mResult] = useState<any>(null);
   const [loadingIntraday15m, setLoadingIntraday15m] = useState(false);
   const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
+  const [isHarvesting5m, setIsHarvesting5m] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const matchedCandRef = useRef<HTMLDivElement | null>(null);
+
+  const handleRun5mHarvester = async (datasetId?: string) => {
+    setIsHarvesting5m(true);
+    try {
+      const res = await fetch('/api/miner/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true, datasetId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.processedCount > 0) {
+          setToastMessage(`⚡ Harvested 5m intraday candles for ${data.processedCount} dataset(s)!`);
+        } else {
+          setToastMessage(data.message || 'No pending datasets queued for 5m harvesting.');
+        }
+      } else {
+        setToastMessage('⚠️ 5m Harvester execution failed.');
+      }
+    } catch (err) {
+      console.error('Failed to run 5m harvester:', err);
+      setToastMessage('⚠️ Failed to connect to 5m Harvester.');
+    } finally {
+      setIsHarvesting5m(false);
+      setTimeout(() => setToastMessage(null), 4000);
+      fetchSavedDatasets();
+    }
+  };
 
   useEffect(() => {
     if (isAssociationModalOpen && matchedCandRef.current) {
@@ -1119,20 +1148,30 @@ export default function Home() {
                     <FlaskConical className="w-5 h-5 text-emerald-400" /> Approved Research Datasets & Candidates ({savedDatasets.length})
                   </h3>
                   <span className="bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    🌙 Phase 2: Off-Market Hours Processing Queue
+                    🌙 Off-Market Cron: 3pm-Midnight & Midnight-6am M-F, Sat & Sun All Day (Every 15m)
                   </span>
                 </div>
                 <p className="text-xs text-muted mt-0.5">
-                  Named 15m intraday datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) persisted from Phase 1 ready for strategy synthesis.
+                  Persisted datasets (<code className="text-amber-400 font-mono">{"{SYMBOL}_{MMDDYYYY}_{ROI}"}</code>) ready for 5m intraday harvesting & foreign-key linkage.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={fetchSavedDatasets}
-                className="text-xs bg-background border border-border text-muted hover:text-foreground px-3 py-1.5 rounded-lg font-semibold cursor-pointer"
-              >
-                Refresh Datasets
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRun5mHarvester()}
+                  disabled={isHarvesting5m}
+                  className="text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> {isHarvesting5m ? 'Harvesting 5m Bars...' : '⚡ Run 5m Harvester Now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={fetchSavedDatasets}
+                  className="text-xs bg-background border border-border text-muted hover:text-foreground px-3 py-1.5 rounded-lg font-semibold cursor-pointer"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {savedDatasets.length > 0 ? (
@@ -1144,8 +1183,8 @@ export default function Home() {
                       <th className="pb-3">Symbol</th>
                       <th className="pb-3">Conviction Date</th>
                       <th className="pb-3">ROI / Range %</th>
-                      <th className="pb-3">15m Date Range</th>
-                      <th className="pb-3">Bars Saved</th>
+                      <th className="pb-3">Date Range</th>
+                      <th className="pb-3">5m FK Bars</th>
                       <th className="pb-3">Status</th>
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
@@ -1162,11 +1201,19 @@ export default function Home() {
                         <td className="text-xs text-muted">{ds.convictionDate}</td>
                         <td className="text-purple-400 font-bold">{ds.roiPct.toFixed(1)}%</td>
                         <td className="text-xs font-mono">{ds.startDate} → {ds.endDate}</td>
-                        <td className="text-xs text-cyan-400 font-bold">{ds.barCount} bars (15m)</td>
+                        <td className="text-xs text-cyan-400 font-bold">
+                          {ds._count?.marketCandles !== undefined ? ds._count.marketCandles : (ds.barCount || 0)} 5m bars (Linked FK)
+                        </td>
                         <td>
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-bold">
-                            🟢 {ds.status}
-                          </span>
+                          {ds.status === 'HARVESTED_5M' ? (
+                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
+                              🟢 HARVESTED_5M
+                            </span>
+                          ) : (
+                            <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 w-fit">
+                              ⏳ PENDING_5M_HARVEST
+                            </span>
+                          )}
                         </td>
                         <td className="text-right py-3">
                           <div className="flex items-center justify-end gap-2">
