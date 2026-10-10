@@ -59,6 +59,19 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
     endDate: string;
   } | null>(null);
 
+  // Interactive Indicator Overlay Visibility Toggles
+  const [activeOverlays, setActiveOverlays] = useState<Record<string, boolean>>({
+    vidya: true,
+    medianMA: true,
+    volumeMA: true,
+    optimalSignals: true,
+    convictionStars: true,
+  });
+
+  const toggleOverlay = (key: string) => {
+    setActiveOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Sliding X-Axis Timeline Controls
   const [visibleCount, setVisibleCount] = useState(60); // Default 60 bars visible
   const [startIndex, setStartIndex] = useState(0);
@@ -174,23 +187,25 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
     });
 
     // 4. Draw Volume MA (Amber Line)
-    ctx.beginPath();
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.5;
-    let volMaStarted = false;
-    visibleCandles.forEach((c, idx) => {
-      if (c.volumeMA !== undefined) {
-        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
-        const yPos = getVolY(c.volumeMA);
-        if (!volMaStarted) {
-          ctx.moveTo(xPos, yPos);
-          volMaStarted = true;
-        } else {
-          ctx.lineTo(xPos, yPos);
+    if (activeOverlays.volumeMA) {
+      ctx.beginPath();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      let volMaStarted = false;
+      visibleCandles.forEach((c, idx) => {
+        if (c.volumeMA !== undefined) {
+          const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+          const yPos = getVolY(c.volumeMA);
+          if (!volMaStarted) {
+            ctx.moveTo(xPos, yPos);
+            volMaStarted = true;
+          } else {
+            ctx.lineTo(xPos, yPos);
+          }
         }
-      }
-    });
-    ctx.stroke();
+      });
+      ctx.stroke();
+    }
 
     // 5. Draw Price Candlesticks
     visibleCandles.forEach((c, idx) => {
@@ -218,12 +233,12 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
       ctx.fillRect(xPos - barWidth / 2 + 0.5, rectTop, Math.max(1, barWidth - 1), rectH);
 
       // 6. Draw Gold Star (★ Badge) for Conviction Days or 🎯 Target Badge for Optimal Signals
-      if (c.isOptimalSignal) {
+      if (c.isOptimalSignal && activeOverlays.optimalSignals) {
         ctx.font = 'bold 12px sans-serif';
         ctx.fillStyle = '#22c55e';
         ctx.textAlign = 'center';
         ctx.fillText('🎯 BUY', xPos, highY - 8);
-      } else if (c.isConvictionDay) {
+      } else if (c.isConvictionDay && activeOverlays.convictionStars) {
         ctx.font = 'bold 14px sans-serif';
         ctx.fillStyle = '#eab308';
         ctx.textAlign = 'center';
@@ -232,42 +247,46 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
     });
 
     // 7. Draw Median Price MA Overlay Line (Cyan)
-    ctx.beginPath();
-    ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
-    ctx.lineWidth = 2;
-    let maStarted = false;
-    visibleCandles.forEach((c, idx) => {
-      if (c.medianPriceMA !== undefined) {
-        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
-        const yPos = getPriceY(c.medianPriceMA);
-        if (!maStarted) {
-          ctx.moveTo(xPos, yPos);
-          maStarted = true;
-        } else {
-          ctx.lineTo(xPos, yPos);
+    if (activeOverlays.medianMA) {
+      ctx.beginPath();
+      ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
+      ctx.lineWidth = 2;
+      let maStarted = false;
+      visibleCandles.forEach((c, idx) => {
+        if (c.medianPriceMA !== undefined) {
+          const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+          const yPos = getPriceY(c.medianPriceMA);
+          if (!maStarted) {
+            ctx.moveTo(xPos, yPos);
+            maStarted = true;
+          } else {
+            ctx.lineTo(xPos, yPos);
+          }
         }
-      }
-    });
-    ctx.stroke();
+      });
+      ctx.stroke();
+    }
 
     // 7b. Draw Variable Index Dynamic Average (VIDYA Line - Purple)
-    ctx.beginPath();
-    ctx.strokeStyle = '#c084fc';
-    ctx.lineWidth = 2;
-    let vidyaStarted = false;
-    visibleCandles.forEach((c, idx) => {
-      if (c.vidya !== undefined) {
-        const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
-        const yPos = getPriceY(c.vidya);
-        if (!vidyaStarted) {
-          ctx.moveTo(xPos, yPos);
-          vidyaStarted = true;
-        } else {
-          ctx.lineTo(xPos, yPos);
+    if (activeOverlays.vidya) {
+      ctx.beginPath();
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2;
+      let vidyaStarted = false;
+      visibleCandles.forEach((c, idx) => {
+        if (c.vidya !== undefined) {
+          const xPos = paddingLeft + (idx + 0.5) * (chartW / visibleCandles.length);
+          const yPos = getPriceY(c.vidya);
+          if (!vidyaStarted) {
+            ctx.moveTo(xPos, yPos);
+            vidyaStarted = true;
+          } else {
+            ctx.lineTo(xPos, yPos);
+          }
         }
-      }
-    });
-    ctx.stroke();
+      });
+      ctx.stroke();
+    }
 
     // 8. Render Drag Selection Range Overlay (Active Drag or Selected Range)
     let highlightStartIdx: number | null = null;
@@ -332,7 +351,7 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
 
       ctx.setLineDash([]);
     }
-  }, [visibleCandles, hoverCandle, mousePos, isDragging, dragStartIdx, dragCurrentIdx, selectedRange, isLight]);
+  }, [visibleCandles, hoverCandle, mousePos, isDragging, dragStartIdx, dragCurrentIdx, selectedRange, isLight, activeOverlays]);
 
   const getIndexFromX = (x: number) => {
     const canvas = canvasRef.current;
@@ -480,8 +499,8 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
           )}
         </div>
 
-        {/* Legend Indicators */}
-        <div className="text-muted-foreground text-[11px] flex items-center gap-3 font-semibold pt-1 sm:pt-0 flex-wrap">
+        {/* Interactive Indicator Overlay Legend & Toggles */}
+        <div className="text-muted-foreground text-[11px] flex items-center gap-2 font-semibold pt-1 sm:pt-0 flex-wrap">
           {selectedRange && (
             <button
               onClick={clearSelection}
@@ -490,24 +509,70 @@ export default function StockChart({ candles, onRangeSelect, theme, zoomPresets 
               ✕ Clear Selected Range ({selectedRange.startDate} - {selectedRange.endDate})
             </button>
           )}
-          <span className="flex items-center gap-1 text-purple-400 font-bold">
-            <span className="w-3 h-0.5 bg-purple-400"></span> VIDYA
-          </span>
-          <span className="flex items-center gap-1 text-cyan-500 font-bold">
-            <span className="w-3 h-0.5 bg-cyan-500"></span> MedianMA
-          </span>
-          <span className="flex items-center gap-1 text-amber-500 font-bold">
-            <span className="w-3 h-0.5 bg-amber-500"></span> VolumeMA
-          </span>
-          <span className="flex items-center gap-1 text-emerald-400 font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span> 🎯 Optimal Signal
-          </span>
-          <span className="flex items-center gap-1 text-amber-500 font-bold">
-            <span className="w-3 h-0.5 bg-amber-500"></span> VolumeMA
-          </span>
-          <span className="flex items-center gap-1 text-amber-500 font-bold">
-            <span className="w-2 h-2 rounded-full bg-amber-500"></span> ★ Conviction Day
-          </span>
+          <button
+            type="button"
+            onClick={() => toggleOverlay('vidya')}
+            className={`px-2 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 font-bold ${
+              activeOverlays.vidya
+                ? 'bg-purple-500/20 text-purple-400 border-purple-500/40 shadow-[0_0_8px_rgba(192,132,252,0.2)]'
+                : 'bg-background text-muted border-border opacity-50 line-through'
+            }`}
+            title="Toggle VIDYA (Variable Index Dynamic Average) Overlay"
+          >
+            <span className="w-2.5 h-0.5 bg-purple-400"></span> VIDYA
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleOverlay('medianMA')}
+            className={`px-2 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 font-bold ${
+              activeOverlays.medianMA
+                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
+                : 'bg-background text-muted border-border opacity-50 line-through'
+            }`}
+            title="Toggle Median Price MA Overlay"
+          >
+            <span className="w-2.5 h-0.5 bg-cyan-400"></span> MedianMA
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleOverlay('volumeMA')}
+            className={`px-2 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 font-bold ${
+              activeOverlays.volumeMA
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                : 'bg-background text-muted border-border opacity-50 line-through'
+            }`}
+            title="Toggle Volume MA Sub-Panel Line"
+          >
+            <span className="w-2.5 h-0.5 bg-amber-400"></span> VolumeMA
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleOverlay('optimalSignals')}
+            className={`px-2 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 font-bold ${
+              activeOverlays.optimalSignals
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_8px_rgba(34,197,94,0.2)]'
+                : 'bg-background text-muted border-border opacity-50 line-through'
+            }`}
+            title="Toggle Optimal BUY Signal Canvas Badges"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span> 🎯 Optimal Signals
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleOverlay('convictionStars')}
+            className={`px-2 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 font-bold ${
+              activeOverlays.convictionStars
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                : 'bg-background text-muted border-border opacity-50 line-through'
+            }`}
+            title="Toggle Conviction Star Canvas Badges"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span> ★ Conviction
+          </button>
         </div>
       </div>
 

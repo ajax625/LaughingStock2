@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getStockCandles, getAlpacaClock } from '@/lib/market-data';
+import { enrichCandlesWithChande } from '@/lib/chande-indicators';
 
 /**
  * Get date parts in target timezone (default ET / America/New_York)
@@ -174,7 +175,9 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
 
         let insertedCount = 0;
         if (fiveMinCandles.length > 0) {
-          const records = fiveMinCandles.map((c) => ({
+          const enriched5m = enrichCandlesWithChande(fiveMinCandles);
+
+          const records = enriched5m.map((c) => ({
             datasetId: dataset.id,
             symbol: dataset.symbol,
             interval: '5m',
@@ -184,6 +187,15 @@ export async function processPhase2Harvesting(options: HarvestOptions = {}) {
             low: Number(c.low || 0),
             close: Number(c.close || 0),
             volume: BigInt(Math.round(c.volume || 0)),
+            indicators: {
+              cmo: c.cmo,
+              trendScore: c.trendScore,
+              vidya: c.vidya,
+              dmi: c.dmi,
+              rvol: c.rvol,
+              volumeMA: c.volumeMA,
+              medianPriceMA: c.medianPriceMA,
+            },
           }));
 
           const dbRes = await prisma.marketCandle.createMany({
