@@ -1457,6 +1457,13 @@ export default function Home() {
                   <StockChart
                     candles={aggregateCandles(harvestRawCandles, harvestChartInterval)}
                     theme={theme}
+                    zoomPresets={[
+                      { label: '1H', count: 12 },
+                      { label: '2H', count: 24 },
+                      { label: '4H', count: 48 },
+                      { label: '1D', count: 78 },
+                      { label: 'ALL', count: harvestRawCandles.length || 999999 },
+                    ]}
                   />
                 )}
               </div>

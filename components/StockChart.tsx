@@ -3,13 +3,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { EnrichedCandle } from '@/lib/conviction-detector';
 
+export interface ZoomPreset {
+  label: string;
+  count: number;
+}
+
 interface StockChartProps {
   candles: any[];
   onRangeSelect?: (range: { startDate: string; endDate: string; candleCount: number } | null) => void;
   theme?: 'dark' | 'light';
+  zoomPresets?: ZoomPreset[];
 }
 
-export default function StockChart({ candles, onRangeSelect, theme }: StockChartProps) {
+export default function StockChart({ candles, onRangeSelect, theme, zoomPresets }: StockChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverCandle, setHoverCandle] = useState<any | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
@@ -385,7 +391,16 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
   };
 
   const totalCandlesCount = candles ? candles.length : 0;
-  const is365View = visibleCount >= totalCandlesCount || visibleCount === 365;
+  const activeZoomPresets: ZoomPreset[] = zoomPresets || [
+    { label: '30D', count: 30 },
+    { label: '60D', count: 60 },
+    { label: '90D', count: 90 },
+    { label: '180D', count: 180 },
+    { label: '365D', count: 365 },
+    { label: 'ALL', count: 999999 },
+  ];
+
+  const isAllView = visibleCount >= totalCandlesCount;
   const maxStartIndex = Math.max(0, totalCandlesCount - visibleCount);
 
   return (
@@ -460,15 +475,16 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
         {/* Zoom Window Presets */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-muted-foreground font-bold">Zoom Window:</span>
-          {[30, 60, 90, 180, 365].map((cnt) => {
-            const isSelected = visibleCount === cnt || (cnt === 365 && visibleCount >= totalCandlesCount);
+          {activeZoomPresets.map((preset) => {
+            const isSelected = visibleCount === preset.count || (preset.label === 'ALL' && isAllView);
             return (
               <button
-                key={cnt}
+                key={preset.label}
                 type="button"
                 onClick={() => {
-                  setVisibleCount(cnt);
-                  setStartIndex(Math.max(0, totalCandlesCount - cnt));
+                  const targetCount = preset.count >= totalCandlesCount ? totalCandlesCount : preset.count;
+                  setVisibleCount(targetCount);
+                  setStartIndex(Math.max(0, totalCandlesCount - targetCount));
                 }}
                 className={`px-3 py-1.5 rounded-lg font-extrabold text-xs transition cursor-pointer ${
                   isSelected
@@ -476,7 +492,7 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
                     : 'bg-background text-muted-foreground border border-border hover:text-foreground hover:bg-card/60'
                 }`}
               >
-                {cnt}D
+                {preset.label}
               </button>
             );
           })}
@@ -486,10 +502,10 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
         <div className="w-full lg:w-[60%] flex flex-col gap-1.5 shrink-0">
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-muted-foreground font-semibold flex items-center gap-2">
-              <span>Slide 365D Timeline:</span>
-              {is365View ? (
+              <span>Slide Timeline:</span>
+              {isAllView ? (
                 <span className="text-amber-500 font-mono text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-                  🔒 Slider Disabled in 365D View
+                  🔒 Slider Disabled (All Bars Visible)
                 </span>
               ) : (
                 <span className="text-emerald-500 font-mono text-[10px] font-bold">
@@ -523,7 +539,7 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
             </div>
 
             {/* 2. Active Range Highlight Box on Timeline Track */}
-            {totalCandlesCount > 0 && !is365View && (
+            {totalCandlesCount > 0 && !isAllView && (
               <div
                 className={`absolute top-1 bottom-1 rounded pointer-events-none transition-all duration-75 border z-15 ${
                   isLight
@@ -537,13 +553,13 @@ export default function StockChart({ candles, onRangeSelect, theme }: StockChart
               />
             )}
 
-            {/* 3. Range Input Slider (Disabled in 365d view) */}
+            {/* 3. Range Input Slider (Disabled in All View) */}
             <input
               type="range"
               min="0"
               max={maxStartIndex}
-              disabled={is365View}
-              value={is365View ? 0 : startIndex}
+              disabled={isAllView}
+              value={isAllView ? 0 : startIndex}
               onChange={(e) => setStartIndex(Number(e.target.value))}
               className="w-full h-full opacity-60 hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed accent-emerald-500 cursor-pointer relative z-20"
             />
