@@ -1,7 +1,7 @@
-# UI Clean Up Implementation Plan: 4-Phase Architecture & Harvester Grid Layout
+# UI Clean Up Implementation Plan: 4-Phase Architecture & Harvester Grid Layout (Updated)
 
 ## Goal Description
-Reorganize and streamline the application navigation into a clean **4-Phase Workflow Architecture**, clean up text blurbs, place controls on the far right, expand the dataset grid to full real estate, and migrate strategy analysis to Phase 3.
+Reorganize and streamline the application navigation into a clean **4-Phase Workflow Architecture**, clean up text blurbs, place controls on the far right, split Phase 2 into a **Top 50% Harvester Grid** and **Bottom 50% Harvested Candle Chart**, and migrate strategy analysis to Phase 3.
 
 ---
 
@@ -10,13 +10,13 @@ Reorganize and streamline the application navigation into a clean **4-Phase Work
 | Phase | Tab Name | Icon | Purpose & Components |
 |---|---|---|---|
 | **Phase 1** | **Research Studio** | `Search` / `Sliders` | Post-Open Conviction Day Detector Studio, 1D candles in memory, 15m range selection & candidate matching. |
-| **Phase 2** | **Harvester** | `Database` / `Sparkles` | **5m Intraday Candle Harvester Grid** with foreign-key linkage. Full-width grid, header toolbar with "Run Harvester Now" on the far right, schedule & next run badges. |
+| **Phase 2** | **Harvester** | `Database` / `Sparkles` | **5m Intraday Candle Harvester Grid & Chart Viewer**. Top 50% grid, bottom 50% candle chart for selected dataset. |
 | **Phase 3** | **Analyzer** | `FlaskConical` / `Cpu` | **Analysis & Strategy Formalization** panel (migrated from Phase 2). Pre-move fingerprint mining, Typeface.ai JEV prompt construction, and JEV action score outputs. |
 | **Phase 4** | **Monitoring** | `Radio` / `Activity` | **Active Signals & Execution Monitor**. Real-time JEV signals, win rate metrics, and live position alerts. |
 
 ---
 
-## Proposed UI Changes
+## Detailed UI Changes
 
 ### 1. Sidebar Navigation (`app/page.tsx`)
 - Update sidebar navigation list:
@@ -29,15 +29,36 @@ Reorganize and streamline the application navigation into a clean **4-Phase Work
 
 ---
 
-### 2. Phase 2 Harvester Screen Clean Up (`app/page.tsx`)
-- **Remove Blurbs**: Strip out non-essential text blurbs (e.g. `Persisted datasets ({SYMBOL}_{MMDDYYYY}_{ROI}) ready for 5m intraday harvesting & foreign-key linkage.`).
+### 2. Phase 2 Harvester Screen (Top 50% Grid & Bottom 50% Chart)
+
+#### A. Header Toolbar & Clean Up
+- **Remove Blurbs**: Strip out non-essential text blurbs (`Persisted datasets ({SYMBOL}_{MMDDYYYY}_{ROI}) ready for 5m intraday harvesting & foreign-key linkage.`).
 - **Header Layout**:
   - **Left**: `Phase 2: 5m Intraday Harvester` title + Datasets count badge + Off-market cron schedule badge + Next run badge (`⏰ Next Scheduled Run: {nextRun}`).
   - **Far Right**: Flexbox container with **`⚡ Run Harvester Now`** button (amber gradient button) and **`Refresh`** button.
-- **Full Real Estate Grid**:
-  - Remove arbitrary max-width restrictions and padding constraints.
-  - Set table wrapper to `w-full min-w-full overflow-x-auto`.
-  - Add clean hover highlights, crisp border dividers, and full-width metric columns.
+
+#### B. Top 50% Real Estate Dataset Grid
+- Grid occupies the **top 50%** of the Phase 2 screen area.
+- Table columns: `Dataset Name`, `Symbol`, `Conviction Date`, `ROI / Range %`, `Date Range`, `5m FK Bars`, `Status`, `Actions`.
+- **Actions Column Clean Up**:
+  - **Removed**: "Mine Fingerprint →" button.
+  - **Removed**: "Inspect 15m Bars" button.
+  - **Added**: **`📊 View Harvested Data`** button (cyan border button).
+  - **Retained**: `✕` Delete button.
+
+#### C. Bottom 50% Harvested Candle Chart & Timeframe Aggregator
+- When **`📊 View Harvested Data`** is clicked on a dataset row:
+  - Activates the selected dataset state and populates the **bottom 50%** chart container.
+  - Fetches foreign-key linked `MarketCandle` records (`interval = '5m'`) from PostgreSQL / API.
+  - Base candles displayed at **5-minute (`5m`)** interval.
+  - **Timeframe Increment Selector**: Buttons allowing real-time candle aggregation into:
+    - **`5m`** (Raw 5-minute harvested candles)
+    - **`1h`** (1-Hour aggregated candles)
+    - **`2h`** (2-Hour aggregated candles)
+    - **`4h`** (4-Hour aggregated candles)
+    - **`1d`** (Daily session candles)
+    - **`10d`** (10-Day aggregated trend candles)
+  - Displays candlestick OHLCV graph, volume bars, and dataset range markers.
 
 ---
 
@@ -56,17 +77,21 @@ Reorganize and streamline the application navigation into a clean **4-Phase Work
 
 ---
 
-## Technical File Modifications
+## Technical Implementation Plan
 
-### `app/page.tsx`
-1. Update `activeTab` state type to `'dashboard' | 'portfolio' | 'research' | 'harvester' | 'analyzer' | 'signals'`.
-2. Update sidebar navigation buttons and click handlers.
-3. Clean up Phase 2 component layout:
-   - Move "Run Harvester Now" button to `flex justify-between` right container.
-   - Remove extra paragraph blurbs.
-   - Update grid table layout to fill 100% width.
-4. Render Phase 3 (`activeTab === 'analyzer'`) with migrated strategy analysis components.
-5. Render Phase 4 (`activeTab === 'signals'`) with monitoring components.
+### 1. API Route for FK Linked Harvested Candles (`app/api/research/datasets/[id]/candles/route.ts` or `app/api/miner/candles/route.ts`)
+- `GET /api/research/datasets/[id]/candles`
+  - Queries `prisma.marketCandle.findMany({ where: { datasetId }, orderBy: { timestamp: 'asc' } })`.
+  - Returns array of 5m candles formatted for the chart engine.
+
+### 2. Timeframe Aggregation Utility (`lib/market-data.ts` or `lib/miner/aggregator.ts`)
+- Function `aggregateCandles(candles: Candle[], interval: '5m'|'1h'|'2h'|'4h'|'1d'|'10d')`:
+  - Bundles 5-minute candles into target interval buckets (`open` of first, `high` max, `low` min, `close` last, `volume` sum).
+
+### 3. Page Layout & Component Updates (`app/page.tsx`)
+- Update state: `selectedHarvestDataset`, `harvestChartInterval` (`'5m' | '1h' | '2h' | '4h' | '1d' | '10d'`).
+- Update Phase 2 rendering into two 50% split panels.
+- Update Actions column buttons.
 
 ---
 
@@ -79,10 +104,11 @@ Reorganize and streamline the application navigation into a clean **4-Phase Work
    ```
 
 ### Manual Verification
-1. Click **Phase 1: Research Studio**: Verify conviction candidate detector & range selector.
-2. Click **Phase 2: Harvester**:
-   - Verify zero text blurbs.
-   - Verify **"Run Harvester Now"** button is on the far right.
-   - Verify table grid expands across 100% of the screen width.
+1. Click **Phase 2: Harvester**:
+   - Verify top 50% contains dataset grid with zero text blurbs.
+   - Verify **"Run Harvester Now"** button is on far right.
+   - Verify actions column has **"View Harvested Data"** button (and no "Mine Fingerprint" / "Inspect 15m Bars").
+2. Click **"View Harvested Data"** on a row:
+   - Verify bottom 50% displays the 5m candle chart for that dataset.
+   - Click timeframe buttons (**5m**, **1h**, **2h**, **4h**, **1d**, **10d**) and verify chart aggregates candles accurately.
 3. Click **Phase 3: Analyzer**: Verify Analysis & Strategy Formalization panel is located in Phase 3.
-4. Click **Phase 4: Monitoring**: Verify Active Signals & Monitoring panel displays correctly.
